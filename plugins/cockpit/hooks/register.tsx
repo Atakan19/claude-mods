@@ -1,0 +1,16 @@
+import type { Register } from 'claude-code'
+
+import { registerBand } from './band'
+import { registerData } from './data'
+import { registerPane } from './pane'
+import { registerReply } from './reply'
+import { registerSpinner } from './spinner'
+
+// Wiring only: each part lives in its own file and can be switched off in /config.
+export const register: Register = (on, options) => {
+  registerData(on, options.toasts !== false, options.pane !== false)
+  if (options.band !== false) registerBand(on)
+  if (options.pane !== false) registerPane(on)
+  if (options.replyLine !== false) registerReply(on)
+  if (options.spinner !== false) registerSpinner(on)
+}

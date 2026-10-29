@@ -1,0 +1,12 @@
+{
+  "name": "atakan-mods",
+  "owner": { "name": "Atakan19" },
+  "description": "Claude Code mods by Atakan19",
+  "plugins": [
+    {
+      "name": "cockpit",
+      "source": "./plugins/cockpit",
+      "description": "Session cockpit: band above the prompt, detail pane, a line under each reply"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "name": "cockpit",
+  "version": "0.1.0",
+  "description": "Session cockpit: a band above the prompt, a detail pane, a line under each reply",
+  "author": { "name": "Atakan19" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "band": { "type": "boolean", "title": "Band", "description": "Show the band above the prompt", "default": true },
+    "pane": { "type": "boolean", "title": "Pane", "description": "Open the detail pane beside the chat", "default": true },
+    "replyLine": { "type": "boolean", "title": "Reply line", "description": "Show a line of figures under each reply", "default": true },
+    "spinner": { "type": "boolean", "title": "Spinner", "description": "Add the tool count to the working line", "default": true },
+    "toasts": { "type": "boolean", "title": "Toasts", "description": "Warn before the cache lapses and at 90% of the 5h limit", "default": true }
+  }
+}
