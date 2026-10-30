@@ -77,6 +77,8 @@ export type AgentRow = {
   endedAt: number | null
   model?: string
   effort?: string
+  // Tool calls the agent made so far.
+  tools?: number
 }
 
 // Claude's own task list (TaskCreate/TaskUpdate or TodoWrite), mirrored as a plan.

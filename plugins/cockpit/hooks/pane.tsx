@@ -127,7 +127,7 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
       leaves: goals.map((g, i) => ({
         key: `g-${i}`,
         title: g.condition,
-        sub: g.endedAt === null ? `${g.by === 'you' ? 'von dir' : 'von Claude'} · seit ${span(now - g.at)}` : 'beendet',
+        sub: g.endedAt === null ? `${g.by === 'you' ? 'von dir' : 'von Claude'} · ${now - g.at < 60e3 ? 'gerade eben' : `seit ${span(now - g.at)}`}` : 'beendet',
         time: '',
         state: g.endedAt === null ? 'running' : 'done',
         color: GOAL,
@@ -202,7 +202,30 @@ const dirOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) :
 const nameOf = (p: string) => p.slice(p.lastIndexOf('/') + 1)
 
 // Agents: running and waiting first, then the newest; Clawd dressed for the role, the state in the figure.
-function agentsTab({ Box, Text, Svg }: DesktopUi, roster: AgentRow[], now: number) {
+// One line of a details list: the name dim on the left, the value on the right.
+function Fact({ Box, Text, name, value }: Pick<DesktopUi, 'Box' | 'Text'> & { name: string; value: string }) {
+  return (
+    <Box flexDirection="row" columnGap={1}>
+      <Text dimColor>{name}</Text>
+      <Box flexGrow={1} />
+      <Text wrap="truncate-start">{value}</Text>
+    </Box>
+  )
+}
+
+// git's "3 hours ago" as "3 h".
+const ageOf = (age: string) =>
+  age
+    .replace(/ ago$/, '')
+    .replace(/ seconds?/, ' s')
+    .replace(/ minutes?/, ' min')
+    .replace(/ hours?/, ' h')
+    .replace(/ days?/, ' T')
+    .replace(/ weeks?/, ' W')
+    .replace(/ months?/, ' Mon')
+    .replace(/ years?/, ' J')
+
+function agentsTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, roster: AgentRow[], folded: string[], now: number) {
   if (roster.length === 0) return <Text dimColor>Noch keine Agents in dieser Session.</Text>
   const live = (a: AgentRow) => a.state === 'running' || a.state === 'waiting'
   const list = [...roster].sort((a, b) => Number(live(b)) - Number(live(a)) || b.startedAt - a.startedAt)
@@ -212,23 +235,34 @@ function agentsTab({ Box, Text, Svg }: DesktopUi, roster: AgentRow[], now: numbe
         const role = roleOf(a.type, a.description)
         const [word, color] = MOOD[a.state]
         return (
-          <Box key={a.id} flexDirection="row" columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+          <Box key={a.id} flexDirection="row" columnGap={1} alignItems="flex-start" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
             <Svg source={clawdSvg(role, a.state)} alt={`${ROLE_NAME[role]}, ${word}`} width={CLAWD.w * 0.7} height={CLAWD.h * 0.7} />
-            <Box flexDirection="column" flexGrow={1} flexShrink={1}>
-              <Box flexDirection="row" columnGap={1}>
-                <Text bold wrap="truncate-end">
-                  {a.description}
+            {/* The text is the switch: a press folds the details open; the ring says the state. */}
+            <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
+              <Button key={`agent-${a.id}`} plain onPress={() => void toggleFold($, `agent-${a.id}`)}>
+                <Text bold>{a.description}</Text>
+                {'\n'}
+                <Text dimColor>{[role === 'plain' ? a.type : ROLE_NAME[role], a.model && modelName(a.model), elapsed((a.endedAt ?? now) - a.startedAt)].filter(Boolean).join(' · ')}</Text>
+                {'\n'}
+                <Text color={a.state === 'waiting' ? C.warn : a.state === 'error' ? C.alert : undefined} dimColor={a.state === 'done'}>
+                  {a.state === 'done' ? `${a.tools ?? 0} Tools` : a.tool}
                 </Text>
-                <Box flexGrow={1} />
-                <Text color={color}>● {word}</Text>
-              </Box>
-              <Text dimColor wrap="truncate-end">
-                {[role === 'plain' ? a.type : ROLE_NAME[role], a.model && modelName(a.model), elapsed((a.endedAt ?? now) - a.startedAt)].filter(Boolean).join(' · ')}
-              </Text>
-              <Text color={a.state === 'waiting' ? C.warn : a.state === 'error' ? C.alert : undefined} dimColor={a.state === 'done'} wrap="truncate-end">
-                {a.state === 'done' ? 'fertig' : a.tool}
-              </Text>
+              </Button>
+              {folded.includes(`agent-${a.id}`) && (
+                <Box flexDirection="column" marginTop={1}>
+                  <Fact Box={Box} Text={Text} name="Typ" value={a.type} />
+                  <Fact Box={Box} Text={Text} name="Modell" value={[a.model && modelName(a.model), a.effort].filter(Boolean).join(' · ') || '–'} />
+                  <Fact Box={Box} Text={Text} name="Gestartet" value={clock(a.startedAt)} />
+                  <Fact Box={Box} Text={Text} name={a.endedAt === null ? 'Läuft seit' : 'Dauer'} value={elapsed((a.endedAt ?? now) - a.startedAt)} />
+                  <Fact Box={Box} Text={Text} name="Tools" value={String(a.tools ?? 0)} />
+                  <Fact Box={Box} Text={Text} name="Zuletzt" value={a.tool || '–'} />
+                  <Button key={`agent-view-${a.id}`} plain onPress={() => void $.ui.view({ agentId: a.id }).catch(() => undefined)}>
+                    <Text color={C.chat}>Unterhaltung öffnen →</Text>
+                  </Button>
+                </Box>
+              )}
             </Box>
+            <Svg source={ringSvg(a.state, color)} alt={word} width={18} height={18} />
           </Box>
         )
       })}
@@ -299,6 +333,18 @@ function filesTab($: EngineInterface, { Box, Text, Button }: DesktopUi, changed:
   )
 }
 
+// A prompt's opening for the history. The app hands some turns in itself, wrapped in tags: a command,
+// a message from an agent, a notice from the background. Those read as words, not markup.
+function promptLine(prompt: string | undefined) {
+  if (!prompt) return 'Turn'
+  const command = /<command-name>\/?([^<]+)<\/command-name>/.exec(prompt)
+  if (command) return `/${command[1]!.trim()}`
+  if (prompt.startsWith('<agent-message')) return 'Nachricht von einem Agent'
+  if (prompt.startsWith('<task-notification')) return 'Meldung aus dem Hintergrund'
+  if (prompt.startsWith('<')) return prompt.replace(/<[^>]*>/g, '').trim() || 'Meldung der App'
+  return prompt
+}
+
 // Verlauf: a dot per turn with the prompt's opening, events in between, the newest last; the last 15.
 function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: SessionEvent[]) {
   const rows = [...turns.map(t => ({ at: t.at, turn: t })), ...events.map(e => ({ at: e.at, event: e }))].sort((a, b) => a.at - b.at).slice(-15)
@@ -313,7 +359,7 @@ function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: Sessio
           <Svg source={stepSvg('turn' in row ? 'turn' : 'event', i === rows.length - 1)} alt="" width={STEP.w} height={STEP.h} />
           {'turn' in row && row.turn ? (
             <Box flexDirection="column" flexShrink={1}>
-              <Text wrap="truncate-end">{row.turn.prompt || 'Turn'}</Text>
+              <Text wrap="truncate-end">{promptLine(row.turn.prompt)}</Text>
               <Text dimColor wrap="truncate-end">
                 {elapsed(row.turn.seconds * 1000)} · {row.turn.tools} Tools · +{k(row.turn.ctxDelta)}
                 {row.turn.cacheHit > 0 ? ' · Cache ' : ''}
@@ -392,7 +438,11 @@ export function registerPane(on: On) {
               const badge = badges[t.key] ?? null
               return (
                 <Box key={t.key} flexGrow={1} width="25%" flexDirection="row" justifyContent="center" alignItems="flex-start">
-                  {t.key === tab ? <Button key={`tab-${t.key}`} plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button key={`tab-${t.key}`} plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
+                  {t.key === tab ? (
+                    <Button key={`tab-${t.key}`} plain label={t.label} onPress={() => void setTab($, t.key)} />
+                  ) : (
+                    <Button key={`tab-${t.key}`} plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />
+                  )}
                   {/* The count, small and set to the top of the name's row, like an exponent. */}
                   {badge && (
                     <Text size="caption" weight="bold" color={badge.color}>
@@ -496,9 +546,10 @@ export function registerPane(on: On) {
               <Text dimColor mono>
                 {c.hash}
               </Text>
-              <Text wrap="truncate-end">{c.subject}</Text>
-              <Box flexGrow={1} />
-              <Text dimColor>{c.age.replace(/ ago$/, '')}</Text>
+              <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                <Text wrap="truncate-end">{c.subject}</Text>
+              </Box>
+              <Text dimColor>{ageOf(c.age)}</Text>
             </Box>
           ))}
           {env.unpushed === null ? <Text dimColor>Kein Upstream-Branch</Text> : env.unpushed === 0 ? <Text color={C.ok}>● gepusht</Text> : <Text color={C.warn}>↑{env.unpushed} nicht gepusht</Text>}
@@ -506,8 +557,9 @@ export function registerPane(on: On) {
           {env.files.slice(0, 6).map(file => (
             <Box key={file.path} flexDirection="row" columnGap={1}>
               <Text color={FILE_COLOR[file.status]}>{file.status}</Text>
-              <Text wrap="truncate-start">{file.path}</Text>
-              <Box flexGrow={1} />
+              <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                <Text wrap="truncate-start">{file.path}</Text>
+              </Box>
               {file.added > 0 && <Text color={C.ok}>+{file.added}</Text>}
               {file.removed > 0 && <Text color={C.alert}>−{file.removed}</Text>}
             </Box>
@@ -548,32 +600,30 @@ export function registerPane(on: On) {
             {env?.repo && (
               <Box flexDirection="row" columnGap={1} alignItems="flex-start" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
                 <Svg source={repoSvg(env.isGithub, '#ececec')} alt={env.isGithub ? 'GitHub' : 'Git'} width={20} height={20} />
-                <Box flexDirection="column" flexShrink={1}>
-                  <Box flexDirection="row" columnGap={1}>
-                    <Text bold>{env.repo.split('/').pop()}</Text>
-                    {env.repo.includes('/') && <Text dimColor>{env.repo.split('/')[0]}</Text>}
-                  </Box>
+                {/* A button holds only text, so the card's two lines are the switch, not its logo or margins. */}
+                <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
+                  <Button key="repo-name" plain onPress={() => void toggleRepoOpen($)}>
+                    <Text bold>{env.repo.split('/').pop()}</Text> {env.repo.includes('/') && <Text dimColor>{env.repo.split('/')[0]}</Text>} <Text dimColor>{repoOpen ? '▴' : '▾'}</Text>
+                  </Button>
                   {/* Ahead green, behind amber; lines added green, removed red. */}
-                  <Box flexDirection="row" columnGap={1} flexWrap="wrap">
-                    {env.branch !== '' && <Text dimColor>⑂ {env.branch}</Text>}
-                    {env.branch !== env.base && env.ahead > 0 && <Text color={C.ok}>↑{env.ahead}</Text>}
-                    {env.branch !== env.base && env.behind > 0 && <Text color={C.warn}>↓{env.behind}</Text>}
-                    {env.branch !== env.base && env.ahead + env.behind > 0 && <Text dimColor>gegen {env.base}</Text>}
-                    {env.changed > 0 && <Text dimColor>● {env.changed} geändert</Text>}
-                    {env.added > 0 && <Text color={C.ok}>+{env.added}</Text>}
+                  <Button key="repo-line" plain onPress={() => void toggleRepoOpen($)}>
+                    {env.branch !== '' && <Text dimColor>⑂ {env.branch} </Text>}
+                    {env.branch !== env.base && env.ahead > 0 && <Text color={C.ok}>↑{env.ahead} </Text>}
+                    {env.branch !== env.base && env.behind > 0 && <Text color={C.warn}>↓{env.behind} </Text>}
+                    {env.branch !== env.base && env.ahead + env.behind > 0 && <Text dimColor>gegen {env.base} </Text>}
+                    {env.changed > 0 && <Text dimColor>· ● {env.changed} geändert </Text>}
+                    {env.added > 0 && <Text color={C.ok}>+{env.added} </Text>}
                     {env.removed > 0 && <Text color={C.alert}>−{env.removed}</Text>}
-                  </Box>
+                  </Button>
                   {repoOpen && repoDetails(env)}
                 </Box>
-                <Box flexGrow={1} />
-                <Button plain dimColor label={repoOpen ? '▴' : '▾'} onPress={() => void toggleRepoOpen($)} />
               </Box>
             )}
 
             <Box flexDirection="row">{dials.map(dial)}</Box>
           </Box>
 
-          {tab === 'agents' && agentsTab({ Box, Text, Svg, Button }, roster, now)}
+          {tab === 'agents' && agentsTab($, { Box, Text, Svg, Button }, roster, folded, now)}
           {tab === 'files' && filesTab($, { Box, Text, Svg, Button }, changedFiles, touches, folded, now)}
           {tab === 'history' && historyTab({ Box, Text, Svg, Button }, turns, events)}
           {tab === 'session' && (

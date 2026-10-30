@@ -290,7 +290,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
       const prev = await getLive($)
       const effort = e.effort !== undefined ? String(e.effort) : prev?.effort
       if (prev && (prev.model !== e.model || prev.effort !== effort)) {
-        if (prev.model && prev.model !== e.model) await addEvent($, { at: await $.clock.now(), kind: 'model', note: `${modelName(prev.model)} → ${modelName(e.model)}` })
+        if (prev.model.startsWith('claude-') && prev.model !== e.model) await addEvent($, { at: await $.clock.now(), kind: 'model', note: `${modelName(prev.model)} → ${modelName(e.model)}` })
         await setLive($, p => ({ ...(p ?? prev), model: e.model, ...(effort !== undefined ? { effort } : {}) }))
         await retitlePane($).catch(() => {})
       }
@@ -329,7 +329,8 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
       await setRunning($, { tools: turnStart.tools })
       if (e.tool === 'AskUserQuestion') void alert($, 'decision', sounds, toasts)
     } else if (isCrew) {
-      await upsertCrew($, { id: agentId, state: 'running', tool: e.tool })
+      const before = (await getCrew($)).find(a => a.id === agentId)?.tools ?? 0
+      await upsertCrew($, { id: agentId, state: 'running', tool: e.tool, tools: before + 1 })
     }
     const r = await next(e)
     // Past a permission dialog the tool ran: the strip is no longer waiting. Caught here, so
