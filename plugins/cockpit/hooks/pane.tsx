@@ -3,7 +3,7 @@ import type { EngineInterface, On } from 'claude-code'
 import type { AgentRow, Env, Limit, Live, Plan, Shell, Subchat } from '../types'
 import { bar, clock, elapsedOf, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
-import { BEAD, C, beadsWidth, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
+import { BADGE_H, BEAD, C, badgeSvg, badgeWidth, beadsWidth, tabBarSvg, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
 import { elapsed } from './progress'
 import { PANE, getRunning, getCrew, getEnv, getFolded, getLive, getPlan, getShells, getSubchats, getTab, getTally, getTick, setTab, toggleFold } from './state'
 
@@ -139,7 +139,10 @@ export function registerPane(on: On) {
     const folded = await getFolded($)
     const tab = await getTab($)
     const env = await getEnv($)
-    const groups = groupsOf(await getPlan($), await getCrew($), await getShells($), await getSubchats($), await $.clock.now())
+    const plan = await getPlan($)
+    const crew = await getCrew($)
+    const liveAgents = crew.filter(a => a.state === 'running' || a.state === 'waiting').length
+    const groups = groupsOf(plan, crew, await getShells($), await getSubchats($), await $.clock.now())
     await getTick($)
     const now = await $.clock.now()
     const since = tally.since
@@ -148,13 +151,25 @@ export function registerPane(on: On) {
       const { Box, Text, Svg, Button } = $.ui.resolve(e)
       if (!l) return <Text dimColor>Wartet auf die erste Antwort…</Text>
       // A segment switch across the width: the open tab lifts out of the track.
+      // A rounded track like the cards; the open tab is bright with a bar under it, a badge says what runs there.
+      const badges: Record<string, { text: string; color: string } | null> = {
+        agents: liveAgents > 0 ? { text: String(liveAgents), color: C.agent } : null,
+        plan: plan && plan.steps.length > 0 ? { text: `${plan.steps.filter(s => s.status === 'completed').length}/${plan.steps.length}`, color: C.chat } : null,
+      }
       const tabs = (
-        <Box flexDirection="row" backgroundColor={C.card} paddingX={1}>
-          {TABS.map(t => (
-            <Box key={t.key} flexGrow={1} width="25%" justifyContent="center" backgroundColor={t.key === tab ? C.segment : undefined}>
-              {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
-            </Box>
-          ))}
+        <Box flexDirection="row" backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+          {TABS.map(t => {
+            const badge = badges[t.key] ?? null
+            return (
+              <Box key={t.key} flexGrow={1} width="25%" flexDirection="column" alignItems="center" hover={{ backgroundColor: C.card }}>
+                <Box flexDirection="row" columnGap={1} alignItems="center">
+                  {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
+                  {badge && <Svg source={badgeSvg(badge.text, badge.color)} alt={badge.text} width={badgeWidth(badge.text)} height={BADGE_H} />}
+                </Box>
+                <Svg source={tabBarSvg(t.key === tab ? C.chat : 'none')} alt={t.key === tab ? 'offen' : 'Tab'} width={28} height={3} />
+              </Box>
+            )
+          })}
         </Box>
       )
       const five = l.limits.find(lim => lim.kind === 'five_hour')
@@ -170,8 +185,8 @@ export function registerPane(on: On) {
           <Box
             position="absolute"
             top={6}
-            {...(side === 'left' ? { left: 0 } : side === 'right' ? { right: 0 } : { left: -6 })}
-            width={28}
+            // Flush with the pane's left or right edge; the middle one reaches equally past both sides of its dial.
+            {...(side === 'left' ? { left: 0, width: 28 } : side === 'right' ? { right: 0, width: 28 } : { left: -4, right: -4 })}
             display="none"
             hover={{ display: 'flex' }}
             flexDirection="column"
