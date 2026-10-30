@@ -5,9 +5,8 @@ import { cacheLeft, cacheTtlMs, k, modelName, span } from './format'
 import { retitlePane, startPane } from './pane'
 import { clearDonePlan } from './plan'
 import { FOLD_MS } from './progress'
-import { notify } from './notify'
 import { play } from './sound'
-import { addEvent, addGoal, addShell, addSubchat, addTouch, addTurn, endGoals, bumpTick, countAgent, dropDoneCrew, endShells, getCrew, getEnv, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
+import { addEvent, addGoal, addShell, addSubchat, addTouch, addTurn, endGoals, bumpTick, countAgent, dropDoneCrew, endShells, getCrew, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
 
 type Reading = Pick<SessionUsage, 'context' | 'rateLimits' | 'cost'>
 
@@ -105,14 +104,11 @@ async function noteShell($: EngineInterface, description: string | undefined, id
   await addShell($, { id, title: description || 'Shell', startedAt: await $.clock.now(), endedAt: null })
 }
 
-// The sound when it is on, and a toast too: the person may have no speakers on. The toast shows in
-// the chat; the system's notification, naming the session's folder, reaches them in another window.
+// The sound when it is on, and a toast too: the person may have no speakers on.
 async function alert($: EngineInterface, kind: keyof typeof ALERT, sounds: boolean, toasts: boolean) {
   if (sounds) play($, kind)
   if (!toasts) return
   $.ui.toast(ALERT[kind], { timeoutMs: 10_000 })
-  const env = await getEnv($).catch(() => null)
-  notify($, ALERT[kind], env?.repo ? `${env.repo.split('/').pop()} · ${env.branch || env.folder}` : env?.folder || 'Claude Code')
 }
 
 // What fills the context, counted locally ('summary': no request is made).

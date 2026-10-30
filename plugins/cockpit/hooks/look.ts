@@ -36,7 +36,7 @@ const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
 export const DIAL = { w: 88, h: 80 }
 // A three-quarter ring filled to the percent, the value and its name inside. `pace`, the share of the
 // limit's window gone by, is a white tick on the ring: a fill past it is spending faster than time.
-export function dialSvg(percent: number, color: string, value: string, label: string, pace: number | null) {
+export function dialSvg(percent: number, color: string, value: string, label: string, pace: number | null, paceColor = '#ececec') {
   const r = 34
   const c = 44
   const full = 2 * Math.PI * r
@@ -48,7 +48,7 @@ export function dialSvg(percent: number, color: string, value: string, label: st
   if (pace !== null) {
     const a = ((135 + 2.7 * Math.max(0, Math.min(100, pace))) * Math.PI) / 180
     const at = (d: number) => `${(c + d * Math.cos(a)).toFixed(1)} ${(c + d * Math.sin(a)).toFixed(1)}`
-    tick = `<path d="M${at(r - 7)}L${at(r + 7)}" stroke="#ececec" stroke-opacity=".75" stroke-width="2" stroke-linecap="round"/>`
+    tick = `<path d="M${at(r - 7)}L${at(r + 7)}" stroke="${paceColor}" stroke-opacity=".85" stroke-width="2" stroke-linecap="round"/>`
   }
   const text = (y: number, size: number, fill: string, weight: number, s: string) =>
     `<text x="${c}" y="${y}" text-anchor="middle" fill="${fill}" font-size="${size}" font-weight="${weight}" font-family="Segoe UI, system-ui, sans-serif">${esc(s)}</text>`
@@ -87,7 +87,8 @@ export function ringSvg(state: RingState, color: string) {
 }
 
 // The tree, one line per group in its color. The drawings fix each row's height, so the line runs through.
-export const TWIG = { w: 26, dot: 14, x: 9, head: 32, leaf: 64 }
+// leaf is taller than a card (about 86 px), so cards keep a gap while the line runs through.
+export const TWIG = { w: 26, dot: 14, x: 9, head: 32, leaf: 98 }
 const stroke = (color: string) => `fill="none" stroke="${color}" stroke-opacity=".55" stroke-width="1.5"`
 // The group's head: a dot; open, its line starts under it.
 export const headSvg = (color: string, isOpen: boolean) =>

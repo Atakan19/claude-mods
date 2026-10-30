@@ -1,4 +1,4 @@
-import type { Elements, EngineInterface, On } from 'claude-code'
+import type { Elements, EngineInterface, On, RenderElement } from 'claude-code'
 
 import type { AgentRow, Env, GitFile, Goal, Limit, Live, Plan, SessionEvent, Shell, Subchat, Touch, Turn } from '../types'
 import { bar, clock, elapsedOf, k, modelName, paceOf, span, toneColor } from './format'
@@ -96,8 +96,16 @@ function resetText(l: Limit, now: number) {
 }
 
 // The warning under a dial, or none while all is calm.
+// Past half the window a fresh chat is the cheaper way on; the ring marks that line.
+const NEW_CHAT_AT = 50
 function ctxWarning(percent: number) {
-  return percent >= 90 ? { text: '⚠ Jetzt /compact', color: C.alert } : percent >= 75 ? { text: '⚠ Bald voll', color: C.warn } : null
+  return percent >= 90
+    ? { text: '⚠ Jetzt /compact', color: C.alert }
+    : percent >= 75
+      ? { text: '⚠ Bald voll', color: C.warn }
+      : percent >= NEW_CHAT_AT
+        ? { text: 'Neuer Chat empfohlen', color: C.warn }
+        : null
 }
 function limitWarning(l: Limit, now: number) {
   const tone = paceOf(l, now)
@@ -273,60 +281,88 @@ function agentsTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, ro
 // Dateien: what changed, by folder, and what was only read, folded until asked.
 function filesTab($: EngineInterface, { Box, Text, Button }: DesktopUi, changed: FileRow[], touches: Touch[], folded: string[], now: number) {
   const reads = touches.filter(t => t.kind === 'read' && !changed.some(c => c.path === t.path || t.path.endsWith(c.path))).sort((a, b) => b.at - a.at)
-  const dirs = [...new Set(changed.map(c => dirOf(c.path)))].sort()
   const isReadOpen = folded.includes('files-read-open')
   const added = changed.reduce((n, c) => n + c.added, 0)
   const removed = changed.reduce((n, c) => n + c.removed, 0)
   if (changed.length === 0 && reads.length === 0) return <Text dimColor>Diese Session hat noch keine Datei angefasst.</Text>
-  return (
-    <Box flexDirection="column">
-      <Box flexDirection="row" columnGap={1}>
-        <Text dimColor>Geändert</Text>
-        <Box flexGrow={1} />
-        {added > 0 && <Text color={C.ok}>+{added}</Text>}
-        {removed > 0 && <Text color={C.alert}>−{removed}</Text>}
-        {changed.length === 0 && <Text dimColor>nichts</Text>}
+  // One line per file: a dot in the change's color, the name, its folder dim; nothing for what is empty.
+  const row = (key: string, dot: string, path: string, right: RenderElement[]) => (
+    <Box key={key} flexDirection="row" columnGap={1}>
+      <Text color={dot}>●</Text>
+      <Text wrap="truncate-end">{nameOf(path)}</Text>
+      <Box flexGrow={1} flexShrink={1} minWidth={0}>
+        <Text dimColor wrap="truncate-start">
+          {dirOf(path)}
+        </Text>
       </Box>
-      {dirs.map(dir => (
-        <Box key={dir || '.'} flexDirection="column" marginTop={1}>
-          <Text dimColor>{dir === '' ? 'Wurzel' : `${dir}/`}</Text>
-          {changed
-            .filter(c => dirOf(c.path) === dir)
-            .map(c => (
-              <Box key={c.path} flexDirection="row" columnGap={1} paddingLeft={1}>
-                <Text bold color={FILE_COLOR[c.status]}>
-                  {c.status === '?' ? 'A' : c.status}
-                </Text>
-                <Text wrap="truncate-end">{nameOf(c.path)}</Text>
-                <Box flexGrow={1} />
-                {c.added > 0 && <Text color={C.ok}>+{c.added}</Text>}
-                {c.removed > 0 && <Text color={C.alert}>−{c.removed}</Text>}
-                <Text dimColor>{c.at !== null ? `vor ${span(now - c.at)}` : ''}</Text>
-              </Box>
-            ))}
-        </Box>
-      ))}
-      {reads.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Box flexDirection="row">
-            <Button plain dimColor label={`${isReadOpen ? '▾' : '▸'} Gelesen`} onPress={() => void toggleFold($, 'files-read-open')} />
+      {right}
+    </Box>
+  )
+  return (
+    <Box flexDirection="column" rowGap={1}>
+      {changed.length > 0 && (
+        <Box flexDirection="column" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+          <Box flexDirection="row" columnGap={1}>
+            <Text bold>Geändert</Text>
+            <Text dimColor>{changed.length}</Text>
             <Box flexGrow={1} />
-            <Text dimColor>{reads.length} Dateien</Text>
+            {added > 0 && <Text color={C.ok}>+{added}</Text>}
+            {removed > 0 && <Text color={C.alert}>−{removed}</Text>}
+          </Box>
+          {[...changed]
+            .sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
+            .map(c =>
+              row(c.path, FILE_COLOR[c.status], c.path, [
+                ...(c.added > 0
+                  ? [
+                      <Text key="a" color={C.ok}>
+                        +{c.added}
+                      </Text>,
+                    ]
+                  : []),
+                ...(c.removed > 0
+                  ? [
+                      <Text key="r" color={C.alert}>
+                        −{c.removed}
+                      </Text>,
+                    ]
+                  : []),
+                ...(c.at !== null
+                  ? [
+                      <Text key="t" dimColor>
+                        {span(now - c.at)}
+                      </Text>,
+                    ]
+                  : []),
+              ]),
+            )}
+        </Box>
+      )}
+      {reads.length > 0 && (
+        <Box flexDirection="column" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+          <Box flexDirection="row" columnGap={1}>
+            <Button key="files-read" plain onPress={() => void toggleFold($, 'files-read-open')}>
+              <Text bold>Gelesen</Text>{' '}
+              <Text dimColor>
+                {reads.length} {isReadOpen ? '▴' : '▾'}
+              </Text>
+            </Button>
           </Box>
           {isReadOpen &&
-            reads.map(r => (
-              <Box key={r.path} flexDirection="row" columnGap={1} paddingLeft={1}>
-                <Text dimColor>R</Text>
-                <Text dimColor wrap="truncate-end">
-                  {nameOf(r.path)}
-                </Text>
-                <Text dimColor wrap="truncate-end">
-                  {dirOf(r.path)}
-                </Text>
-                <Box flexGrow={1} />
-                <Text dimColor>{r.count}×</Text>
-              </Box>
-            ))}
+            reads.map(r =>
+              row(
+                r.path,
+                C.twig,
+                r.path,
+                r.count > 1
+                  ? [
+                      <Text key="n" dimColor>
+                        {r.count}×
+                      </Text>,
+                    ]
+                  : [],
+              ),
+            )}
         </Box>
       )}
     </Box>
@@ -466,6 +502,7 @@ export function registerPane(on: On) {
         label: string
         sub: string
         pace: number | null
+        paceColor?: string
         warning: { text: string; color: string } | null
         facts: [string, string][]
         parts?: { name: string; tokens: number }[]
@@ -475,7 +512,7 @@ export function registerPane(on: On) {
       const dial = (d: Dial) => (
         <Box key={d.key} flexDirection="column" alignItems="center" width={DIAL.w + 14}>
           <Box flexDirection="column" alignItems="center" paddingX={2} borderStyle="round" borderColor={C.clear} hover={{ scope: `dial-${d.key}`, backgroundColor: C.card, borderColor: C.card }}>
-            <Svg source={dialSvg(d.percent, d.color, d.value, d.label, d.pace)} alt={`${d.label} ${d.value}`} width={DIAL.w} height={DIAL.h} />
+            <Svg source={dialSvg(d.percent, d.color, d.value, d.label, d.pace, d.paceColor)} alt={`${d.label} ${d.value}`} width={DIAL.w} height={DIAL.h} />
             {d.sub !== '' && <Text dimColor>{d.sub}</Text>}
             {d.warning && <Text color={d.warning.color}>{d.warning.text}</Text>}
           </Box>
@@ -576,13 +613,16 @@ export function registerPane(on: On) {
           value: l.ctxTokens > 0 ? k(l.ctxTokens) : '–',
           label: 'Context',
           sub: l.ctxTokens > 0 ? `${w.glyph} ${w.word}` : 'misst…',
-          pace: null,
+          // The tick on the context ring: where a new chat is advised.
+          pace: NEW_CHAT_AT,
+          paceColor: C.warn,
           warning: ctxWarning(l.ctxPercent),
           facts: [
             ['Belegt', `${k(l.ctxTokens)} von ${k(l.ctxWindow)}`],
             ['Anteil', `${Math.round(l.ctxPercent)} %`],
             ['Frei', k(Math.max(0, l.ctxWindow - l.ctxTokens))],
             ['Wetter', `${w.glyph} ${w.word}`],
+            ['Neuer Chat', `ab ${NEW_CHAT_AT} %`],
           ],
           ...(l.ctxParts ? { parts: l.ctxParts.slice(0, 6) } : {}),
         },

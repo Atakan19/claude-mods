@@ -8,8 +8,6 @@ Mods for Claude Code. Each mod is a plugin under `plugins/`.
 
 ## Install
 
-The repository is private: installing needs read access on GitHub and a git credential for github.com on the machine (`gh auth login`, then `gh auth setup-git`).
-
 From a shell:
 
 ```
