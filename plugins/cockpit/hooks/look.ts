@@ -61,8 +61,12 @@ export function dialSvg(percent: number, color: string, value: string, label: st
   )
 }
 
-export type RingState = 'running' | 'waiting' | 'pending' | 'done' | 'error' | 'chat'
+// talking: a chat at work, its bubble with three dots pulsing in turn as someone types.
+export type RingState = 'running' | 'waiting' | 'pending' | 'done' | 'error' | 'chat' | 'talking'
 export const RING = 24
+// Three dots pulsing one after another, as a chat shows someone typing.
+const typing = (xs: number[], y: number, r: number, color: string) =>
+  xs.map((x, i) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${color}" opacity=".25"><animate attributeName="opacity" values=".25;1;.25" dur="1.2s" begin="${i * 0.2}s" repeatCount="indefinite"/></circle>`).join('')
 // The leaf's ring: it turns while the work runs, closes green when done, red on a failure.
 export function ringSvg(state: RingState, color: string) {
   const c = RING / 2
@@ -82,6 +86,9 @@ export function ringSvg(state: RingState, color: string) {
     chat:
       `<path d="M5 8a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-5l-4 3.2V17a3 3 0 0 1-2-3z" fill="${color}" fill-opacity=".16" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>` +
       mark('M8.6 9.6h6.8M8.6 12.8h4.4', color),
+    talking:
+      `<path d="M5 8a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-5l-4 3.2V17a3 3 0 0 1-2-3z" fill="${color}" fill-opacity=".16" stroke="${color}" stroke-width="2" stroke-linejoin="round"/>` +
+      typing([8.8, 12, 15.2], 11, 1.4, color),
   }[state]
   return svg(RING, RING, body)
 }
@@ -112,9 +119,10 @@ export function beadsSvg(items: { state: RingState; color: string }[]) {
         ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.alert}" stroke-width="2.2"/>`
         : state === 'pending'
           ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.twig}" stroke-width="1.8" stroke-dasharray="2.6 2.6"/>`
-          : state === 'chat'
+          : state === 'chat' || state === 'talking'
             ? // A chat, as its card shows it unfolded: a small speech bubble.
-              `<path d="M${x - 6.5} ${c - 4}a2.5 2.5 0 0 1 2.5-2.5h8a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5h-4.5l-3.5 2.8v-2.8a2.5 2.5 0 0 1-2.5-2.5z" fill="${color}" fill-opacity=".16" stroke="${color}" stroke-width="1.7" stroke-linejoin="round"/>`
+              `<path d="M${x - 6.5} ${c - 4}a2.5 2.5 0 0 1 2.5-2.5h8a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5h-4.5l-3.5 2.8v-2.8a2.5 2.5 0 0 1-2.5-2.5z" fill="${color}" fill-opacity=".16" stroke="${color}" stroke-width="1.7" stroke-linejoin="round"/>` +
+              (state === 'talking' ? typing([x - 3, x, x + 3], c - 1.5, 1.1, color) : '')
             : state === 'waiting'
             ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.warn}" stroke-width="2.2"/><circle cx="${x}" cy="${c}" r="2.2" fill="${C.warn}"/>`
             : // Running turns like the big ring: an arc on a pale track.

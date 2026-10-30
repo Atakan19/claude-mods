@@ -1,6 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
 import { addTask, finishPlan, fromAppPlan, fromTodos, fromTool, planShare, planState, stuckStep, updateTask } from '../hooks/plan'
+import { subchatStates } from '../hooks/data'
 
 test('TodoWrite lists become a plan and keep step times', async () => {
   const a = fromTodos(null, [
@@ -236,4 +237,53 @@ test("the band's ✕ hides a bar there only; the pane keeps the list", { options
   })
   expect(await pane.find({ type: 'Text', text: /Folien planen/ })).toBeTruthy()
   await pane.unmount()
+})
+
+test("the app's notes on subchats read as at work or resting", async () => {
+  const a = 'local_33d79002-7b81-4cd3-bbf2-56b8339e4501'
+  const b = 'local_04fd5352-b023-49b7-987a-e0b817b6e45d'
+  expect([...subchatStates(`The session "Look" you started (${a}) finished a turn. It reported: done.`)]).toEqual([[a, false]])
+  expect([...subchatStates(`Linked sessions now: look = ${a} (idle); build = ${b} (working).`)]).toEqual([
+    [a, false],
+    [b, true],
+  ])
+  expect(subchatStates('Nothing about sessions here.').size).toBe(0)
+})
+
+test('a subchat card shows it at work until a note says it rests', { options: { language: 'de' } }, async ($, on) => {
+  mock.clock(on, { now: 1_000_000 })
+  on('command.register', () => ({ value: { command: 'cockpit' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('ui.panes', () => ({ value: [] }))
+  on('settings.read', () => ({ value: { model: 'opus' } }))
+  on('session.usage', () => ({
+    value: { startedAt: 0, context: { tokens: 1000, window: 200_000, percent: 1 }, rateLimits: [], cost: { usd: 0 } },
+  }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  const id = 'local_33d79002-7b81-4cd3-bbf2-56b8339e4501'
+  on('tool.call', () => ({ result: { content: [{ type: 'text', text: `Started session "Look test" (session_id: ${id}).` }] } }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine</Text>
+  })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.tool.call({ tool: 'mcp__ccd_session__start_session', title: 'Look test', model: 'claude-sonnet-5-5' })
+  const props = { title: 'Cockpit', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } as const
+  const card = async () => {
+    const pane = await $.ui.mount({ plugin: 'cockpit', component: 'Pane', requestId: 'cockpit', surface: 'desktop', props })
+    return pane
+  }
+  const shut = await card()
+  await shut.press({ key: 'leaf-c-0' })
+  await shut.unmount()
+  const atWork = await card()
+  expect(await atWork.find({ type: 'Text', text: 'läuft' })).toBeTruthy()
+  expect(await atWork.find({ type: 'Text', text: /Sonnet/ })).toBeTruthy()
+  await atWork.unmount()
+  await $.turn.start({ text: `The session "Look test" you started (${id}) finished a turn.`, turnId: 't1' })
+  const resting = await card()
+  expect(await resting.find({ type: 'Text', text: 'ruht' })).toBeTruthy()
+  await resting.unmount()
 })

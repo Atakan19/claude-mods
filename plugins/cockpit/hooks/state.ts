@@ -119,6 +119,11 @@ export async function getSubchats($: EngineInterface) {
 export async function addSubchat($: EngineInterface, chat: Subchat) {
   await update($, subchats, list => [...list, chat].slice(-5))
 }
+// What the app's notes said of the subchats, by session id; one not named keeps its state.
+export async function setSubchatStates($: EngineInterface, states: Map<string, boolean>) {
+  if (states.size === 0) return
+  await update($, subchats, list => list.map(c => (c.id && states.has(c.id) ? { ...c, active: states.get(c.id) } : c)))
+}
 
 export async function getLive($: EngineInterface) {
   return read($, live)

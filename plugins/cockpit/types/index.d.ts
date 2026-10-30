@@ -55,7 +55,9 @@ export type Shell = { id: string; title: string; startedAt: number; endedAt: num
 
 // A session the desktop app started from this one.
 // model: the one it was started on (this session's when none was named).
-export type Subchat = { title: string; at: number; model?: string }
+// id: its session id, read off the start call's answer.
+// active: whether it is at work, as the app's notes about it last said; unknown without an id.
+export type Subchat = { title: string; at: number; model?: string; id?: string; active?: boolean }
 
 export type Turn = {
   at: number

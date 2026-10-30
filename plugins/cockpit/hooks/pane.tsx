@@ -250,7 +250,8 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
       title: t().subchats,
       count: String(chats.length),
       color: C.seven_day,
-      leaves: chats.map((c, i) => ({ key: `c-${i}`, title: c.title, time: t().ago(span(now - c.at)), state: 'chat', color: C.seven_day, details: [[t().type, t().ownChat], ...(c.model ? [[t().model, modelName(c.model)] as [string, string]] : []), [t().started, clock(c.at)]] })),
+      // A subchat shows its bubble, with dots pulsing while it is at work.
+      leaves: chats.map((c, i) => ({ key: `c-${i}`, title: c.title, time: t().ago(span(now - c.at)), state: c.active ? 'talking' : 'chat', color: C.seven_day, details: [[t().type, t().ownChat], ...(c.active !== undefined ? [[t().status, c.active ? t().running : t().resting] as [string, string]] : []), ...(c.model ? [[t().model, modelName(c.model)] as [string, string]] : []), [t().started, clock(c.at)]] })),
     })
   }
   return groups
@@ -1001,7 +1002,7 @@ export function registerPane(on: On, options: PaneOptions = {}) {
           {leaves.map(({ g, leaf }, i) => (
             <Text key={leaf.key} dimColor={leaf.state === 'done' || leaf.state === 'pending'}>
               {i === leaves.length - 1 ? '└─ ' : '├─ '}
-              {leaf.state === 'done' ? '✓' : leaf.state === 'error' ? '✕' : leaf.state === 'chat' ? '◇' : leaf.state === 'pending' ? '○' : '●'} {leaf.title}{' '}
+              {leaf.state === 'done' ? '✓' : leaf.state === 'error' ? '✕' : leaf.state === 'chat' ? '◇' : leaf.state === 'talking' ? '◈' : leaf.state === 'pending' ? '○' : '●'} {leaf.title}{' '}
               <Text dimColor>
                 · {g.title} · {leaf.time}
               </Text>

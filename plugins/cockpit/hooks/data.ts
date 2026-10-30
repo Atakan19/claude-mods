@@ -7,7 +7,7 @@ import { clearDonePlan, LIST_TOOLS, nudgeIfStuck, startPlanTool } from './plan'
 import { FOLD_MS } from './progress'
 import { chooseLang, setLang, t } from './i18n'
 import { play } from './sound'
-import { addActivity, addEvent, addGoal, addShell, addSubchat, addTouch, addTurn, endGoals, bumpTick, countAgent, dropDoneCrew, endShells, countIdle, getCrew, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
+import { addActivity, addEvent, addGoal, addShell, addSubchat, addTouch, setSubchatStates, addTurn, endGoals, bumpTick, countAgent, dropDoneCrew, endShells, countIdle, getCrew, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
 
 type Reading = Pick<SessionUsage, 'context' | 'rateLimits' | 'cost'>
 
@@ -162,6 +162,17 @@ async function apply($: EngineInterface, u: Reading, toasts: boolean, extra: Par
   }))
 }
 
+// The app's notes about the sessions this one started: "… (local_…) finished a turn", "name = local_… (idle)".
+// The only word a mod gets of another session's state, read from the notes' text: a changed wording reads as
+// nothing, and a session the person drives themself is not reported here.
+const RESTING = new Set(['idle', 'stopped', 'archived', 'deleted', 'failed', 'done'])
+export function subchatStates(text: string): Map<string, boolean> {
+  const states = new Map<string, boolean>()
+  for (const m of text.matchAll(/\((local_[0-9a-f-]{36})\)[^\n]*?(finished a turn|was stopped|was deleted|failed)/g)) states.set(m[1]!, false)
+  for (const m of text.matchAll(/= (local_[0-9a-f-]{36}) \((\w+)/g)) states.set(m[1]!, !RESTING.has(m[2]!))
+  return states
+}
+
 // The one source every part draws from: usage, turns, running tools and agents.
 export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boolean, language: unknown, planTool = false) {
   let turnStart = { ctx: 0, cost: 0, tools: 0, prompt: '' }
@@ -218,10 +229,20 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
       const title = (e as { title?: unknown }).title
       if (e.agentId === undefined && !('deny' in r) && !r.isError && typeof title === 'string') {
         const model = (e as { model?: unknown }).model
-        await addSubchat($, { title, at: await $.clock.now(), model: typeof model === 'string' ? model : (await getLive($))?.model })
+        // The answer names the new session ("session_id: local_…"); an offer the person has not taken names none.
+        const id = JSON.stringify(r.result ?? '').match(/local_[0-9a-f-]{36}/)?.[0]
+        await addSubchat($, { title, at: await $.clock.now(), model: typeof model === 'string' ? model : (await getLive($))?.model, ...(id ? { id, active: true } : {}) })
       }
     } catch {}
     return r
+  })
+
+  // The app's notes on the subchats come in as injected messages too; read, passed on untouched.
+  on('prompt.attachment', async ($, e, next) => {
+    try {
+      await setSubchatStates($, subchatStates(e.text))
+    } catch {}
+    return next(e)
   })
 
   // At each stop the engine says what still runs in the background and at which effort it worked.
@@ -341,6 +362,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     turnStart = { ctx: l?.ctxTokens ?? 0, cost: l?.costUsd ?? 0, tools: 0, prompt: e.text.split('\n')[0]!.trim().slice(0, 80) }
     await setRunning($, { tools: 0 })
     if (e.text !== '') await clearDonePlan($)
+    await setSubchatStates($, subchatStates(e.text))
 
     return next(e)
   })
