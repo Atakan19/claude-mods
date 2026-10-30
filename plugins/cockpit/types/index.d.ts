@@ -8,9 +8,23 @@ export type Live = {
   limits: Limit[]
   model: string
   lastRequestAt: number
+  effort?: string
 }
 
+// Where the session runs: the folder, the repository and its branch, how far it is from the main branch, files changed.
+export type Env = { folder: string; repo: string; branch: string; isGithub: boolean; base: string; ahead: number; behind: number; changed: number }
+
+// The whole session, past the 50 turns kept.
+export type Tally = { turns: number; tools: number; since: number | null }
+
+// A shell command Claude left running in the background.
+export type Shell = { id: string; title: string; startedAt: number; endedAt: number | null }
+
+// A session the desktop app started from this one.
+export type Subchat = { title: string; at: number }
+
 export type Turn = {
+  at: number
   answer: string
   seconds: number
   tools: number
@@ -21,13 +35,38 @@ export type Turn = {
 
 export type Running = { tools: number; agents: number }
 
+// A subagent of this session, as its strip shows it; finished ones stay until the batch folds.
+export type AgentRow = {
+  id: string
+  description: string
+  type: string
+  state: 'running' | 'waiting' | 'done' | 'error'
+  tool: string
+  startedAt: number
+  endedAt: number | null
+  model?: string
+  effort?: string
+}
+
+// Claude's own task list (TaskCreate/TaskUpdate or TodoWrite), mirrored as a plan.
+export type StepStatus = 'pending' | 'in_progress' | 'completed'
+export type Step = { id: string; title: string; status: StepStatus; startedAt?: number; endedAt?: number }
+export type Plan = { title: string; steps: Step[]; startedAt: number }
+
 declare module 'claude-code' {
   interface PluginState {
     cockpit: {
       live: Live | null
       turns: Turn[]
       running: Running
+      crew: Shaped<AgentRow[]>
+      plan: Shaped<Plan | null>
       tick: number
+      env: Shaped<Env | null>
+      tally: Tally
+      folded: string[]
+      shells: Shell[]
+      subchats: Subchat[]
     }
   }
 }

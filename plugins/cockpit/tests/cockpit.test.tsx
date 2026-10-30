@@ -12,9 +12,12 @@ test('band and reply line show one turn', async ($, on) => {
   on('command.register', () => ({ value: { command: 'cockpit' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('session.usage', () => ({ value: USAGE }))
+  on('settings.read', () => ({ value: { model: 'opus' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', () => ({ text: '' }))
+  on('agent.spawn', () => ({ agentId: 'a1', model: 'claude-haiku-4-5' }))
+  on('tool.call', (_, e) => ({ result: e.tool === 'Bash' ? { backgroundTaskId: 'b1' } : {} }))
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
     return <Text>engine</Text>
@@ -31,15 +34,53 @@ test('band and reply line show one turn', async ($, on) => {
     usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 90, cache_creation_input_tokens: 0, model: 'claude-opus-5-5' },
   })
 
+  // A spawned subagent gets a strip with its latest tool; an engine fork does not.
+  const spawn = { tool_use_id: 'u1', provider: { plugin: 'engine', tier: 'core' }, parentModel: 'claude-opus-5-5', background: false, fork: false } as const
+  await $.agent.spawn({ ...spawn, prompt: 'look', description: 'Explore code', subagentType: 'Explore' })
+  await $.agent.spawn({ ...spawn, prompt: 'fork', description: 'compact', subagentType: 'fork' })
+  await $.tool.call({ tool: 'Grep', pattern: 'x', agentId: 'a1' })
+  // A command left running and a chat started from here hang off the session in the pane.
+  await $.tool.call({ tool: 'Bash', command: 'npm run dev', description: 'Start dev server', run_in_background: true })
+  await $.tool.call({ tool: 'mcp__ccd_session__start_session', title: 'Pane tabs' } as never)
+
+  // Desktop: the pills, then the agents' bar with one strip.
   const band = await $.ui.mount({
     plugin: 'cockpit',
     component: 'AbovePrompt',
     surface: 'desktop',
     props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} },
   })
-  expect((await band.find({ type: 'Text', text: /34%/ }))?.text).toContain('68.0k/200.0k')
-  expect(await band.find({ type: 'Text', text: /Cache 1h$/})).toBeTruthy()
+  expect(await band.find({ type: 'Text', text: '68k' })).toBeTruthy()
+  expect(await band.find({ type: 'Text', text: '42%' })).toBeTruthy()
+  expect(await band.find({ type: 'Text', text: '1 aktiv · 1' })).toBeTruthy()
+  expect(await band.find({ type: 'Text', text: 'Agents' })).toBeTruthy()
+  const alts = (await band.findAll({ type: 'Svg' })).map(s => String(s.props.alt))
+  expect(alts.filter(a => a.startsWith('agent '))).toEqual(['agent Explore code: running, Grep'])
   await band.unmount()
+
+  // Terminal: the same figures as text.
+  const line = await $.ui.mount({
+    plugin: 'cockpit',
+    component: 'AbovePrompt',
+    surface: 'terminal',
+    props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} },
+  })
+  expect(await line.find({ type: 'Text', text: /cache/ })).toBeTruthy()
+  expect(await line.find({ type: 'Text', text: /Explore code · Grep/ })).toBeTruthy()
+  await line.unmount()
+
+  for (const surface of ['desktop', 'terminal'] as const) {
+    const pane = await $.ui.mount({
+      plugin: 'cockpit',
+      component: 'Pane',
+      requestId: 'cockpit',
+      surface,
+      props: { title: 'Cockpit', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
+    })
+    expect(await pane.find({ type: 'Text', text: 'Opus 5.5' })).toBeTruthy()
+    for (const leaf of ['Start dev server', 'Pane tabs', 'Explore code', 'Turns']) expect(await pane.find({ type: 'Text', text: new RegExp(leaf) })).toBeTruthy()
+    await pane.unmount()
+  }
 
   const reply = await $.ui.mount({
     plugin: 'cockpit',

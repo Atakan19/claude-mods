@@ -8,7 +8,9 @@
     "band": { "type": "boolean", "title": "Band", "description": "Show the band above the prompt", "default": true },
     "pane": { "type": "boolean", "title": "Pane", "description": "Open the detail pane beside the chat", "default": true },
     "replyLine": { "type": "boolean", "title": "Reply line", "description": "Show a line of figures under each reply", "default": true },
+    "plan": { "type": "boolean", "title": "Plan progress", "description": "Show Claude's task list as a progress bar", "default": true },
     "spinner": { "type": "boolean", "title": "Spinner", "description": "Add the tool count to the working line", "default": true },
-    "toasts": { "type": "boolean", "title": "Toasts", "description": "Warn before the cache lapses and at 90% of the 5h limit", "default": true }
+    "sounds": { "type": "boolean", "title": "Sounds", "description": "Play a sound when Claude is done, needs you, or fails", "default": true },
+    "toasts":{ "type": "boolean", "title": "Toasts", "description": "Say when Claude is done, needs you or fails; warn before the cache lapses and at 90% of the 5h limit", "default": true }
   }
 }
