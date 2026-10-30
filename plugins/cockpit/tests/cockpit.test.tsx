@@ -95,8 +95,10 @@ test('band and reply line show one turn', { options: { language: 'de' } }, async
     await pane.press({ key: `tab-${tab}` })
     expect(await pane.find({ type: 'Text', text: want })).toBeTruthy()
   }
-  // The 🕘 opens the history as a dialog of its own.
+  // The 🕘 folds a small card open; its 'show all' opens the whole history.
   await pane.press({ key: 'open-history' })
+  expect(await pane.find({ type: 'Button', key: 'history-all' })).toBeTruthy()
+  await pane.press({ key: 'history-all' })
   const history = await $.ui.mount({ plugin: 'cockpit', component: 'Pane', requestId: 'cockpit-history', surface: 'desktop', props })
   expect(await history.find({ type: 'Text', text: /^hi$/ })).toBeTruthy()
   await history.unmount()

@@ -445,9 +445,10 @@ function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: Sessio
 let SHOW = { rings: true, repo: true, history: true, tabs: TABS }
 type PaneOptions = { paneRings?: unknown; paneRepo?: unknown; tabAgents?: unknown; tabFiles?: unknown; tabHistory?: unknown }
 
-// The history opens as a dialog over the chat: Esc or its ✕ closes it.
+// The whole history opens as a tab of its own, from the small card's "show all"; the card folds shut.
 async function openHistory($: EngineInterface) {
-  await $.ui.open({ id: HISTORY, title: t().historyTitle, focus: true, closeOnEscape: true, rows: 24 })
+  await toggleFold($, 'history-pop')
+  await $.ui.open({ id: HISTORY, title: t().historyTitle, focus: true })
 }
 
 export function registerPane(on: On, options: PaneOptions = {}) {
@@ -759,7 +760,28 @@ export function registerPane(on: On, options: PaneOptions = {}) {
                   {tallyLine(tally)}
                   {since !== null && ` · ${elapsed(now - since)}`}
                 </Text>
-                {SHOW.history && <Button key="open-history" plain dimColor label="🕘" onPress={() => void openHistory($)} />}
+                {SHOW.history && <Button key="open-history" plain dimColor label="🕘" onPress={() => void toggleFold($, 'history-pop')} />}
+                {/* The 🕘 folds a small card open under it: the last turns, and the way to the whole history. */}
+                {SHOW.history && folded.includes('history-pop') && (
+                  <Box position="absolute" top={2} right={0} width={Math.min(44, e.props.bodyColumns - 2)} flexDirection="column" paddingX={1} backgroundColor={C.popup} borderStyle="round" borderColor={C.line}>
+                    <Text bold>{t().historyTitle}</Text>
+                    {foldAppTurns(turns).length === 0 && <Text dimColor>{t().noHistory}</Text>}
+                    {foldAppTurns(turns)
+                      .slice(-5)
+                      .map((turn, i) => (
+                        <Box key={`${turn.at}-${i}`} flexDirection="row" columnGap={1}>
+                          <Text dimColor>{clock(turn.at)}</Text>
+                          <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                            <Text wrap="truncate-end">{promptLine(turn.prompt)}</Text>
+                          </Box>
+                          <Text dimColor>{elapsed(turn.seconds * 1000)}</Text>
+                        </Box>
+                      ))}
+                    <Button key="history-all" plain onPress={() => void openHistory($)}>
+                      <Text color={C.chat}>{t().showAll}</Text>
+                    </Button>
+                  </Box>
+                )}
               </Box>
               {groups.length === 0 && <Text dimColor>{t().nothingAside}</Text>}
               {/* Each group runs on a line of its own: a dot at its name, a twig into each card. */}
