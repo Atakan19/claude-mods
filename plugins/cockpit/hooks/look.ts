@@ -40,7 +40,7 @@ export function dialSvg(percent: number, color: string) {
   )
 }
 
-export type RingState = 'running' | 'waiting' | 'done' | 'error' | 'chat'
+export type RingState = 'running' | 'waiting' | 'pending' | 'done' | 'error' | 'chat'
 export const RING = 24
 // The leaf's ring: it turns while the work runs, closes green when done, red on a failure.
 export function ringSvg(state: RingState, color: string) {
@@ -54,6 +54,8 @@ export function ringSvg(state: RingState, color: string) {
       `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="17 60"><animateTransform attributeName="transform" type="rotate" from="0 ${c} ${c}" to="360 ${c} ${c}" dur="1.4s" repeatCount="indefinite"/></circle>` +
       `<circle cx="${c}" cy="${c}" r="2.4" fill="${color}"/>`,
     waiting: track + `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${C.warn}" stroke-width="2.6" stroke-dasharray="4 4"/>` + mark(`M${c} 7.5v5.5M${c} 16.2v.3`, C.warn),
+    // An open step: a quiet dashed ring, no warning.
+    pending: `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${C.twig}" stroke-width="2" stroke-dasharray="3 3.2"/>`,
     done: `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${C.ok}" stroke-width="2.6"/>` + mark('M7.8 12.4l2.9 2.9 5.5-5.7', C.ok),
     error: `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${C.alert}" stroke-width="2.6"/>` + mark('M8.8 8.8l6.4 6.4M15.2 8.8l-6.4 6.4', C.alert),
     chat:

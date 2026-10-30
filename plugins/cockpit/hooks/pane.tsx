@@ -56,7 +56,7 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
         title: s.title,
         sub: s.status === 'completed' ? 'fertig' : s.status === 'in_progress' ? 'läuft' : 'offen',
         time: s.startedAt ? elapsed((s.endedAt ?? now) - s.startedAt) : '',
-        state: s.status === 'completed' ? 'done' : s.status === 'in_progress' ? 'running' : 'waiting',
+        state: s.status === 'completed' ? 'done' : s.status === 'in_progress' ? 'running' : 'pending',
         color: C.chat,
       })),
     })
@@ -163,11 +163,11 @@ export function registerPane(on: On) {
             </Box>
           )}
 
-          <Svg source={`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="1"><rect width="400" height="1" fill="${C.line}"/></svg>`} alt="" width={400} height={1} />
+          <Svg source={`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="1"><rect width="400" height="1" fill="${C.line}"/></svg>`} alt="Trennlinie" width={400} height={1} />
 
           <Box flexDirection="column">
             <Box flexDirection="row" columnGap={1} alignItems="center">
-              <Svg source={coreSvg('#ececec')} alt="" width={18} height={18} />
+              <Svg source={coreSvg('#ececec')} alt="Diese Session" width={18} height={18} />
               <Text bold>Diese Session</Text>
               <Box flexGrow={1} />
               <Text dimColor>
@@ -179,17 +179,17 @@ export function registerPane(on: On) {
             {groups.map(g => (
               <Box key={g.key} flexDirection="column">
                 <Box flexDirection="row" columnGap={1} alignItems="center">
-                  <Svg source={trunkSvg(20)} alt="" width={TWIG.w} height={20} />
+                  <Svg source={trunkSvg(20)} alt="Zweig" width={TWIG.w} height={20} />
                   <Button plain dimColor label={`${folded.includes(g.key) ? '▸' : '▾'} ${g.title}`} onPress={() => void toggleFold($, g.key)} />
                   {folded.includes(g.key) && g.current && <Text dimColor>· {g.current}</Text>}
                   <Box flexGrow={1} />
                   <Text dimColor>{g.count}</Text>
                 </Box>
                 {!folded.includes(g.key) && g.leaves.map(leaf => {
-                  const isPale = leaf.state === 'done' || (g.key === 'plan' && leaf.state === 'waiting')
+                  const isPale = leaf.state === 'done' || leaf.state === 'pending'
                   return (
                     <Box key={leaf.key} flexDirection="row" alignItems="center">
-                      <Svg source={twigSvg(LEAF_H, leaf.key === lastKey, leaf.isDashed === true)} alt="" width={TWIG.w} height={LEAF_H} />
+                      <Svg source={twigSvg(LEAF_H, leaf.key === lastKey, leaf.isDashed === true)} alt="Zweig" width={TWIG.w} height={LEAF_H} />
                       <Box flexDirection="row" flexGrow={1} columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
                         <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.sub} width={RING} height={RING} />
                         <Box flexDirection="column" flexShrink={1}>
@@ -249,9 +249,9 @@ export function registerPane(on: On) {
             </Text>
           )}
           {leaves.map(({ g, leaf }, i) => (
-            <Text key={leaf.key} dimColor={leaf.state === 'done'}>
+            <Text key={leaf.key} dimColor={leaf.state === 'done' || leaf.state === 'pending'}>
               {i === leaves.length - 1 ? '└─ ' : '├─ '}
-              {leaf.state === 'done' ? '✓' : leaf.state === 'error' ? '✕' : leaf.state === 'chat' ? '◇' : '●'} {leaf.title} <Text dimColor>· {g.title} · {leaf.time}</Text>
+              {leaf.state === 'done' ? '✓' : leaf.state === 'error' ? '✕' : leaf.state === 'chat' ? '◇' : leaf.state === 'pending' ? '○' : '●'} {leaf.title} <Text dimColor>· {g.title} · {leaf.time}</Text>
             </Text>
           ))}
         </Box>
