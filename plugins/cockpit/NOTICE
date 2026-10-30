@@ -1,5 +1,5 @@
 cockpit
-Copyright 2026 Atakan19
+Copyright 2026 Atakan19, licensed under the MIT License (see LICENSE).
 
 This mod reuses code and looks from three mods (and hooks/clawd.ts redraws Clawd,
 Claude Code's pixel mascot by Anthropic PBC, as the Agents tab's figures):

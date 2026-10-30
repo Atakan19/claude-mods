@@ -35,3 +35,7 @@ plugins/<mod>/
   types/index.d.ts                $.state contract
   tests/*.test.tsx                claude plugin test
 ```
+
+## License
+
+MIT, see [LICENSE](LICENSE). Code a mod takes from elsewhere keeps its own license, named in that mod's `NOTICE`.

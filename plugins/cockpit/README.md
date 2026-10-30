@@ -58,6 +58,10 @@ The band's pills are ported from [token-weather-usage](https://github.com/augief
 follow [session-band](https://github.com/JohnnyVizz/claude-kit) (MIT). See [NOTICE](NOTICE)
 and [LICENSE-APACHE-2.0](LICENSE-APACHE-2.0).
 
+## License
+
+MIT, see [LICENSE](LICENSE). The parts taken from other mods keep their own licenses, listed in [NOTICE](NOTICE).
+
 ## Privacy
 
 Reads only the usage figures Claude Code provides, the subagents' names and models, the names of the tools called, the session's folder and repository, the first line of each prompt you send (for the history, kept in the session only), and a few arguments: the description of a command sent to the background (never the command itself), the task list's step titles, the title of a chat the desktop app starts, the path of a file a tool read or edited (never its content), and the text of a goal set with `/goal` or proposed by Claude. It changes, blocks and sends nothing; no network requests, no files read. In a git repository it runs `git branch`, `git rev-parse`, `git rev-list --count`, `git status --porcelain`, `git diff --shortstat`, `git diff --numstat` and `git log -3` in the background after each turn, reading the branch, the commit counts, the last three commit titles and which files changed by how many lines, and on Windows a sound is played through PowerShell's sound player.
