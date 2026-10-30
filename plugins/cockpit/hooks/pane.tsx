@@ -70,7 +70,8 @@ const FILE_COLOR: Record<GitFile['status'], string> = { M: C.warn, A: C.ok, D: C
 
 const capital = (s: string) => (s ? `${s[0]!.toUpperCase()}${s.slice(1)}` : s)
 // The pane's title bar carries the model: "Opus 5.5 (Medium)".
-const paneTitle = (l: Live | null) => (l ? `${modelName(l.model)}${l.effort ? ` (${capital(l.effort)})` : ''}` : 'Cockpit')
+const paneTitle = (_l: Live | null) => 'Cockpit'
+const modelLine = (l: Live) => `${modelName(l.model)}${l.effort ? ` (${capital(l.effort)})` : ''}`
 
 // Called from the one session.start hook in data.ts.
 export async function startPane($: EngineInterface) {
@@ -247,19 +248,19 @@ function agentsTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, ro
             <Svg source={clawdSvg(role, a.state)} alt={`${roleName(role)}, ${word}`} width={CLAWD.w * 0.7} height={CLAWD.h * 0.7} />
             {/* The text is the switch: a press folds the details open; the ring says the state. */}
             <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
-              {/* A button draws one line, so each line is a button of its own, all folding the same details. */}
+              {/* The name alone opens the details; the lines under it are text. */}
               <Button key={`agent-${a.id}`} plain onPress={() => void toggleFold($, `agent-${a.id}`)}>
-                <Text bold>{a.description}</Text>
+                <Text bold>{a.description}</Text> <Text dimColor>{folded.includes(`agent-${a.id}`) ? '▴' : '▾'}</Text>
               </Button>
               {a.task && a.task !== a.description && (
-                <Button key={`agent-${a.id}-task`} plain dimColor onPress={() => void toggleFold($, `agent-${a.id}`)}>
-                  <Text dimColor>{a.task}</Text>
-                </Button>
+                <Text dimColor wrap="truncate-end">
+                  {a.task}
+                </Text>
               )}
-              <Button key={`agent-${a.id}-meta`} plain dimColor onPress={() => void toggleFold($, `agent-${a.id}`)}>
-                <Text dimColor>{[role === 'plain' ? a.type : roleName(role), a.model && modelName(a.model), elapsed((a.endedAt ?? now) - a.startedAt), t().tools(a.tools ?? 0)].filter(Boolean).join(' · ')}</Text>
+              <Text dimColor wrap="truncate-end">
+                {[role === 'plain' ? a.type : roleName(role), a.model && modelName(a.model), elapsed((a.endedAt ?? now) - a.startedAt), t().tools(a.tools ?? 0)].filter(Boolean).join(' · ')}
                 {a.state !== 'done' && a.tool !== '' && <Text color={a.state === 'waiting' ? C.warn : a.state === 'error' ? C.alert : undefined}> · {a.tool}</Text>}
-              </Button>
+              </Text>
               {folded.includes(`agent-${a.id}`) && (
                 <Box flexDirection="column" marginTop={1}>
                   <Fact Box={Box} Text={Text} name={t().type} value={a.type} />
@@ -538,7 +539,15 @@ export function registerPane(on: On, options: PaneOptions = {}) {
       }
       // Hovered, a dial's tile lights and a card with its details opens under it; the surface draws both, no hook
       // runs. Tile and card share a hover scope, so only the tile wakes the card.
-      const dial = (d: Dial) => (
+      // A card a little wider than a third, centered on its dial and pushed back inside the pane at its edges.
+      const inner = Math.max(30, e.props.bodyColumns - 2)
+      const cardW = Math.min(40, inner)
+      const cardLeft = (i: number) => {
+        const third = inner / dials.length
+        const centered = i * third + third / 2 - cardW / 2
+        return Math.round(Math.max(0, Math.min(inner - cardW, centered)) - i * third)
+      }
+      const dial = (d: Dial, i: number) => (
         <Box key={d.key} flexDirection="column" alignItems="center" width="33%">
           <Box flexDirection="column" alignItems="center" paddingX={2} borderStyle="round" borderColor={C.clear} hover={{ scope: `dial-${d.key}`, backgroundColor: C.card, borderColor: C.card }}>
             <Svg source={dialSvg(d.percent, d.color, d.value, d.label, d.pace, d.warning?.color)} alt={`${d.label} ${d.value}`} width={DIAL.w} height={DIAL.h} />
@@ -548,8 +557,8 @@ export function registerPane(on: On, options: PaneOptions = {}) {
           <Box
             position="absolute"
             top={6}
-            left={-1}
-            right={-1}
+            left={cardLeft(i)}
+            width={cardW}
             display="none"
             hover={{ scope: `dial-${d.key}`, display: 'flex' }}
             flexDirection="column"
@@ -614,7 +623,9 @@ export function registerPane(on: On, options: PaneOptions = {}) {
               <Box flexGrow={1} flexShrink={1} minWidth={0}>
                 <Text wrap="truncate-end">{c.subject}</Text>
               </Box>
-              <Box flexShrink={0}>
+              <Box flexShrink={0} flexDirection="row" columnGap={1}>
+                {c.added > 0 && <Text color={C.ok}>+{c.added}</Text>}
+                {c.removed > 0 && <Text color={C.alert}>−{c.removed}</Text>}
                 <Text dimColor>{ageOf(c.age)}</Text>
               </Box>
             </Box>
@@ -706,6 +717,7 @@ export function registerPane(on: On, options: PaneOptions = {}) {
               <Box flexDirection="row" columnGap={1} alignItems="center">
                 <Svg source={coreSvg('#ececec')} alt={t().thisSession} width={18} height={18} />
                 <Text bold>{t().thisSession}</Text>
+                <Text dimColor>{modelLine(l)}</Text>
                 <Box flexGrow={1} />
                 <Text dimColor>
                   {tallyLine(tally)}

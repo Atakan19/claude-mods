@@ -55,7 +55,8 @@ async function readEnv($: EngineInterface): Promise<Env> {
   const stat = await git($, cwd, ['diff', '--shortstat', 'HEAD'])
   const numstat = await git($, cwd, ['diff', '--numstat', 'HEAD'])
   // hash, subject and age, split by tabs
-  const log = await git($, cwd, ['log', '-3', '--format=%h%x09%s%x09%cr'])
+  // each commit's line starts with @@, its --shortstat line follows
+  const log = await git($, cwd, ['log', '-3', '--shortstat', '--format=@@%h%x09%s%x09%cr'])
   const unpushed = await git($, cwd, ['rev-list', '--count', '@{u}..HEAD'])
   return {
     ...none,
@@ -69,11 +70,14 @@ async function readEnv($: EngineInterface): Promise<Env> {
     added: Number(/(\d+) insertion/.exec(stat)?.[1] ?? 0),
     removed: Number(/(\d+) deletion/.exec(stat)?.[1] ?? 0),
     commits: log
-      .split('\n')
+      .split('@@')
       .filter(Boolean)
-      .map(line => {
-        const [hash = '', subject = '', age = ''] = line.split('\t')
-        return { hash, subject, age }
+      .map(block => {
+        const [head = '', ...rest] = block.split('\n')
+        const [hash = '', subject = '', age = ''] = head.split('\t')
+        const stat = rest.join(' ')
+        const num = (re: RegExp) => Number(re.exec(stat)?.[1] ?? 0)
+        return { hash, subject, age, files: num(/(\d+) files? changed/), added: num(/(\d+) insertion/), removed: num(/(\d+) deletion/) }
       }),
     unpushed: unpushed === '' ? null : Number(unpushed),
     files: filesOf(status, numstat),

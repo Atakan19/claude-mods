@@ -26,7 +26,7 @@ export type Env = {
   added: number
   removed: number
   // The last commits, newest first.
-  commits: { hash: string; subject: string; age: string }[]
+  commits: { hash: string; subject: string; age: string; files: number; added: number; removed: number }[]
   // Commits not yet on the upstream branch; null without one.
   unpushed: number | null
   // Files changed against HEAD, paths from the repository's root.

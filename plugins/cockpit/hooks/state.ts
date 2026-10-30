@@ -17,7 +17,7 @@ const plan = atom({ plugin: 'cockpit', key: 'plan' } as const, null, { shape: 'p
 // Bumped every 30 s so countdowns redraw without a turn.
 const tick = atom({ plugin: 'cockpit', key: 'tick' } as const, 0)
 // Tagged: an env stored before the repo card lacks its fields and reads as none.
-const env = atom({ plugin: 'cockpit', key: 'env' } as const, null, { shape: 'env-4' })
+const env = atom({ plugin: 'cockpit', key: 'env' } as const, null, { shape: 'env-5' })
 const tally = atom({ plugin: 'cockpit', key: 'tally' } as const, { turns: 0, tools: 0, since: null })
 // The pane groups the user folded shut.
 const folded = atom({ plugin: 'cockpit', key: 'folded' } as const, [])
