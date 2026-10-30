@@ -30,8 +30,6 @@ function resetText(l: Limit, now: number) {
   return `↻ ${at - now > 20 * 3600e3 ? `${DAYS[new Date(at).getDay()]} ` : ''}${clock(at)}`
 }
 
-// The folder and the surface; the repository has its own card.
-const envLine = (env: Env | null, surface: string) => [env?.folder && `📁 ${env.folder}`, surface === 'desktop' ? 'Desktop' : 'Terminal'].filter(Boolean).join('  ·  ')
 
 // "⑂ feat/pane  ↑3 ↓1 gegen main  ● 5 geändert"; the parts that are zero stay out.
 function repoLine(env: Env) {
@@ -136,9 +134,8 @@ export function registerPane(on: On) {
           <Box flexDirection="column">
             <Box flexDirection="row" columnGap={1}>
               <Text bold>{modelName(l.model)}</Text>
-              {l.effort && <Text dimColor>· {capital(l.effort)}</Text>}
+              {l.effort && <Text dimColor>({capital(l.effort)})</Text>}
             </Box>
-            <Text dimColor>{envLine(env, e.surface)}</Text>
           </Box>
 
           <Box flexDirection="row">
@@ -215,9 +212,8 @@ export function registerPane(on: On) {
         <Box flexDirection="column">
           <Text>
             <Text bold>{modelName(l.model)}</Text>
-            {l.effort && <Text dimColor> · {capital(l.effort)}</Text>}
+            {l.effort && <Text dimColor> ({capital(l.effort)})</Text>}
           </Text>
-          <Text dimColor>{envLine(env, e.surface)}</Text>
         </Box>
         <Box flexDirection="column">
           <Text>
