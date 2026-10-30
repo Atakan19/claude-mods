@@ -150,11 +150,11 @@ const WEATHER_ICONS = {
 }
 
 export const WEATHER = [
-  { upTo: 25, icon: 'clear', glyph: '☀', color: '#e0b000', word: 'Klar' },
-  { upTo: 50, icon: 'cloudy', glyph: '☁', color: '#8ea3b8', word: 'Bewölkt' },
-  { upTo: 75, icon: 'showers', glyph: '☂', color: '#2f68c0', word: 'Schauer' },
-  { upTo: 90, icon: 'storm', glyph: '☇', color: '#b04fc0', word: 'Gewitter' },
-  { upTo: Infinity, icon: 'compact', glyph: '↯', color: '#d64545', word: 'Bald /compact' },
+  { upTo: 25, icon: 'clear', glyph: '☀', color: '#e0b000' },
+  { upTo: 50, icon: 'cloudy', glyph: '☁', color: '#8ea3b8' },
+  { upTo: 75, icon: 'showers', glyph: '☂', color: '#2f68c0' },
+  { upTo: 90, icon: 'storm', glyph: '☇', color: '#b04fc0' },
+  { upTo: Infinity, icon: 'compact', glyph: '↯', color: '#d64545' },
 ] as const
 
 export const weatherOf = (percent: number) => WEATHER.find(w => percent < w.upTo) ?? WEATHER[4]

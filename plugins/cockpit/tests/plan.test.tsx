@@ -47,7 +47,7 @@ test("the desktop app's update_plan list moves step by step", async () => {
   expect(fromAppPlan(null, { advance: true }, 0)).toBe(null)
 })
 
-test('the band shows the task list a TaskCreate call made', async ($, on) => {
+test('the band shows the task list a TaskCreate call made', { options: { language: 'de' } }, async ($, on) => {
   mock.clock(on, { now: 1_000_000 })
   on('command.register', () => ({ value: { command: 'cockpit' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))

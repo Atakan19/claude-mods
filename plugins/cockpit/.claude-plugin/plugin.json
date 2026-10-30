@@ -5,12 +5,22 @@
   "author": { "name": "Atakan19" },
   "types": "./types/index.d.ts",
   "userConfig": {
+    "language": { "type": "string", "title": "Language", "description": "The cockpit's language; auto follows Claude Code's language setting, then the system", "options": ["auto", "de", "en"], "default": "auto" },
     "band": { "type": "boolean", "title": "Band", "description": "Show the band above the prompt", "default": true },
-    "pane": { "type": "boolean", "title": "Pane", "description": "Open the detail pane beside the chat", "default": true },
-    "replyLine": { "type": "boolean", "title": "Reply line", "description": "Show a line of figures under each reply", "default": true },
+    "pillContext": { "type": "boolean", "title": "Band: context pill", "description": "Context size, weather and the last prompts' bars", "default": true },
+    "pillLimit": { "type": "boolean", "title": "Band: 5h pill", "description": "The 5-hour limit against the clock", "default": true },
+    "pillCache": { "type": "boolean", "title": "Band: cache pill", "description": "How long the prompt cache stays warm", "default": true },
+    "pillAgents": { "type": "boolean", "title": "Band: agents pill", "description": "How many subagents run", "default": true },
     "plan": { "type": "boolean", "title": "Plan progress", "description": "Show Claude's task list as a progress bar", "default": true },
+    "pane": { "type": "boolean", "title": "Pane", "description": "Open the detail pane beside the chat", "default": true },
+    "paneRings": { "type": "boolean", "title": "Pane: rings", "description": "Context, 5h and 7d rings at the top of the pane", "default": true },
+    "paneRepo": { "type": "boolean", "title": "Pane: repository card", "description": "Branch, commits and changes of the git repository", "default": true },
+    "tabAgents": { "type": "boolean", "title": "Pane: Agents tab", "description": "Every subagent of the session", "default": true },
+    "tabFiles": { "type": "boolean", "title": "Pane: Files tab", "description": "The files the session changed and read", "default": true },
+    "tabHistory": { "type": "boolean", "title": "Pane: History tab", "description": "The turns of the session, one by one", "default": true },
+    "replyLine": { "type": "boolean", "title": "Reply line", "description": "Show a line of figures under each reply", "default": true },
     "spinner": { "type": "boolean", "title": "Spinner", "description": "Add the tool count to the working line", "default": true },
     "sounds": { "type": "boolean", "title": "Sounds", "description": "Play a sound when Claude is done, needs you, or fails", "default": true },
-    "toasts":{ "type": "boolean", "title": "Toasts", "description": "Say when Claude is done, needs you or fails; warn before the cache lapses and at 90% of the 5h limit", "default": true }
+    "toasts": { "type": "boolean", "title": "Toasts", "description": "Say when Claude is done, needs you or fails; warn before the cache lapses and at 90% of the 5h limit", "default": true }
   }
 }

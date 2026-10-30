@@ -48,6 +48,7 @@ import {
   trackSvg,
   visibleAgents,
 } from './progress'
+import { t } from './i18n'
 import { bumpTick, dropDoneCrew, getCrew, getLive, getPlan, getRunning, getTick, getTurns, setPlan } from './state'
 
 type Ui = Pick<Elements['desktop'], 'Box' | 'Text' | 'Svg' | 'Button'>
@@ -55,7 +56,13 @@ type Ui = Pick<Elements['desktop'], 'Box' | 'Text' | 'Svg' | 'Button'>
 const PLAN_BAR = 'plan'
 const AGENTS_BAR = 'agents'
 
-export function registerBand(on: On) {
+// Which pills the person kept, from /config; fixed per load, as a change of options reloads the module.
+let PILLS = { context: true, limit: true, cache: true, agents: true }
+type BandOptions = { pillContext?: unknown; pillLimit?: unknown; pillCache?: unknown; pillAgents?: unknown }
+
+export function registerBand(on: On, options: BandOptions = {}) {
+  PILLS = { context: options.pillContext !== false, limit: options.pillLimit !== false, cache: options.pillCache !== false, agents: options.pillAgents !== false }
+
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
     const l = await getLive($)
@@ -137,7 +144,7 @@ function barsOf(plan: Plan | null, crew: AgentRow[], now: number): Bar[] {
     return [
       {
         id: PLAN_BAR,
-        title: plan.title,
+        title: plan.title === 'Aufgaben' ? t().tasks : plan.title,
         kind: 'todo',
         // The pill names only the step it stands at; the count stands right of the track.
         stages: [
@@ -164,7 +171,7 @@ function barsOf(plan: Plan | null, crew: AgentRow[], now: number): Bar[] {
   return [
     {
       id: AGENTS_BAR,
-      title: 'Agents',
+      title: t().tabs.agents!,
       kind: 'todo',
       stages: [{ name: '', steps: crew.map(a => ({ title: a.description, status: isEnded(a) ? 'done' : 'active', substeps: [], ...(a.endedAt !== null ? { doneAt: a.endedAt } : {}) })) }],
       state: agentsDoneAt !== null ? 'done' : 'running',
@@ -227,30 +234,30 @@ function pillRow(ui: Ui, l: Live, turns: Turn[], running: Running, crew: AgentRo
   const f = forecastFor(l.ctxPercent)
   const deltas = deltasOf(turns)
   const ctx: JSX.Element[] = [
-    <Svg key="icon" source={weatherSvg(f.id)} alt={`${f.word} · ${Math.round(l.ctxPercent)}%`} width={WEATHER_ICON_SIZE} height={WEATHER_ICON_SIZE} />,
+    <Svg key="icon" source={weatherSvg(f.id)} alt={`${t().weather[f.id]} · ${Math.round(l.ctxPercent)}%`} width={WEATHER_ICON_SIZE} height={WEATHER_ICON_SIZE} />,
     <Text key="tokens" bold>{short(l.ctxTokens)}</Text>,
   ]
   if (deltas.length >= 2) {
-    ctx.push(divider('s'), <Svg key="spark" source={barsSvg(deltas, f.color)} alt={`Tokens der letzten ${deltas.length} Prompts`} width={barsWidth(deltas.length)} height={SPARK_HEIGHT} />)
+    ctx.push(divider('s'), <Svg key="spark" source={barsSvg(deltas, f.color)} alt={t().tokensOf(deltas.length)} width={barsWidth(deltas.length)} height={SPARK_HEIGHT} />)
     const trend = trendWord(turns[turns.length - 1]?.ctxDelta)
     if (trend) ctx.push(<Text key="d" dimColor>{trend}</Text>)
   }
   // No reading before the first reply: the pill waits for one.
-  if (l.ctxTokens > 0) pills.push({ key: 'context', tint: TINTS.context!, parts: ctx, tip: `${f.word} · ${Math.round(l.ctxPercent)}% von ${short(l.ctxWindow)}` })
+  if (PILLS.context && l.ctxTokens > 0) pills.push({ key: 'context', tint: TINTS.context!, parts: ctx, tip: t().ofWindow(t().weather[f.id] ?? '', Math.round(l.ctxPercent), short(l.ctxWindow)) })
 
   // 5h: the gauge against the clock, then the time to the reset.
   const five = l.limits.find(lim => lim.kind === 'five_hour' && !(Date.parse(lim.resetsAt ?? '') <= now))
-  if (five) {
+  if (PILLS.limit && five) {
     const g = gaugeOf(five, now)
     const color = ICON_COLORS.five_hour!
     const parts = [
-      <Svg key="k" source={iconSvg('gauge', color)} alt="5h-Limit" width={16} height={16} />,
+      <Svg key="k" source={iconSvg('gauge', color)} alt={t().fiveHourLimit} width={16} height={16} />,
       <Text key="l">{g.label}</Text>,
-      <Svg key="g" source={svgGauge(g)} alt={`${g.label}: ${g.value} verbraucht`} width={GAUGE.width} height={GAUGE.height} />,
+      <Svg key="g" source={svgGauge(g)} alt={t().usedOf(g.label, g.value)} width={GAUGE.width} height={GAUGE.height} />,
       g.tone === 'alert' ? <Text key="v" bold color={TONES.alert.text}>{g.value}</Text> : <Text key="v" bold>{g.value}</Text>,
     ]
     if (g.when) parts.push(divider('s'), <Svg key="i" source={iconSvg('clock', color, SMALL_ICON)} alt="Reset" width={SMALL_ICON} height={SMALL_ICON} />, <Text key="d" dimColor>{g.when}</Text>)
-    pills.push({ key: 'five_hour', tint: TINTS.five_hour!, parts, tip: g.resetAt ? `Reset um ${g.resetAt}` : '' })
+    pills.push({ key: 'five_hour', tint: TINTS.five_hour!, parts, tip: g.resetAt ? t().resetAt(g.resetAt) : '' })
   }
 
   // Cache: the time it stays warm; a poor hit rate first, red once it lapsed.
@@ -260,11 +267,11 @@ function pillRow(ui: Ui, l: Live, turns: Turn[], running: Running, crew: AgentRo
     left === null
       ? { tone: 'none', value: '—', detail: '', tip: '' }
       : left <= 0
-        ? { tone: 'alert', value: 'abgelaufen', detail: '', tip: `Die nächste Nachricht schreibt den ganzen Context (${short(l.ctxTokens)}) neu.` }
+        ? { tone: 'alert', value: t().expired, detail: '', tip: t().rewrites(short(l.ctxTokens)) }
         : {
             tone: left < CACHE_SOON ? 'fast' : 'calm',
             ...(hit >= GOOD_HIT ? { value: left < MINUTE ? '< 1 min' : duration(left), detail: '' } : { value: `${hit}%`, detail: left < MINUTE ? '< 1 min' : duration(left) }),
-            tip: `Cache warm bis ${clockTime(now + left)}.\nLetzte Nachricht: ${hit}% aus dem Cache.`,
+            tip: t().warmUntil(clockTime(now + left), hit),
           }
   const valueColor = cache.tone === 'alert' ? TONES.alert.text : cache.tone === 'fast' ? TONES.fast.text : undefined
   const cacheParts = [
@@ -272,13 +279,13 @@ function pillRow(ui: Ui, l: Live, turns: Turn[], running: Running, crew: AgentRo
     cache.tone === 'none' ? <Text key="v" dimColor>{cache.value}</Text> : valueColor ? <Text key="v" bold color={valueColor}>{cache.value}</Text> : <Text key="v" bold>{cache.value}</Text>,
   ]
   if (cache.detail) cacheParts.push(divider('s'), <Text key="e" dimColor>{cache.detail}</Text>)
-  pills.push({ key: 'cache', tint: TINTS[cache.tone] ?? TINTS.calm!, parts: cacheParts, tip: cache.tip })
+  if (PILLS.cache) pills.push({ key: 'cache', tint: TINTS[cache.tone] ?? TINTS.calm!, parts: cacheParts, tip: cache.tip })
 
   // Agents: how many the session ran, and how many run now.
-  if (running.agents > 0) {
+  if (PILLS.agents && running.agents > 0) {
     const live = crew.filter(a => !isEnded(a))
-    const value = live.length > 0 ? `${live.length} aktiv · ${running.agents}` : String(running.agents)
-    const tip = [`Agents in dieser Session: ${running.agents}${live.length ? ` (${live.length} aktiv)` : ''}`, ...live.map(a => `  ${a.description}: ${a.tool}`)].join('\n')
+    const value = live.length > 0 ? t().activeOf(live.length, running.agents) : String(running.agents)
+    const tip = [t().agentsInSession(running.agents, live.length), ...live.map(a => `  ${a.description}: ${a.tool}`)].join('\n')
     pills.push({
       key: 'agents',
       tint: TINTS.agents!,
@@ -336,7 +343,7 @@ function barRows($: EngineInterface, { Box, Text, Svg, Button }: Ui, list: Bar[]
                 {track.clock ? (
                   <Box position="absolute" top={0} left={0}>
                     <Box display="none" hover={{ display: 'flex' }}>
-                      <Svg source={liveSource(track.clock, now)} alt={`${p.title} läuft seit ${elapsed(now - p.startedAt)}`} width={trackW} height={TRACK_H} />
+                      <Svg source={liveSource(track.clock, now)} alt={t().runsSince(p.title, elapsed(now - p.startedAt))} width={trackW} height={TRACK_H} />
                     </Box>
                   </Box>
                 ) : null}
@@ -377,24 +384,24 @@ function terminal({ Box, Text }: Pick<Elements['terminal'], 'Box' | 'Text'>, l: 
   return (
     <Box flexDirection="column">
       <Box flexDirection="row" flexWrap="wrap">
-        <Text color={f.color}>{f.icon} </Text>
-        <Text bold>{short(l.ctxTokens)}</Text>
-        {deltas.length >= 2 && <Text dimColor> {barsText(deltas)} {trendWord(turns[turns.length - 1]?.ctxDelta)}</Text>}
-        {g && (
+        {PILLS.context && <Text color={f.color}>{f.icon} </Text>}
+        {PILLS.context && <Text bold>{short(l.ctxTokens)}</Text>}
+        {PILLS.context && deltas.length >= 2 && <Text dimColor> {barsText(deltas)} {trendWord(turns[turns.length - 1]?.ctxDelta)}</Text>}
+        {PILLS.limit && g && (
           <Text>
             {sep}5h <Text color={TONES[g.tone].text}>{textGauge(g)}</Text> <Text bold>{g.value}</Text>
             {g.when && <Text dimColor> · {g.when}</Text>}
           </Text>
         )}
-        {left !== null && (
+        {PILLS.cache && left !== null && (
           <Text>
-            {sep}cache {left <= 0 ? <Text color="red">abgelaufen</Text> : <Text bold>{duration(left)}</Text>}
+            {sep}cache {left <= 0 ? <Text color="red">{t().expired}</Text> : <Text bold>{duration(left)}</Text>}
           </Text>
         )}
-        {running.agents > 0 && (
+        {PILLS.agents && running.agents > 0 && (
           <Text>
             {sep}
-            {live > 0 ? `${live} aktiv · ${running.agents}` : `${running.agents} Agents`}
+            {live > 0 ? t().activeOf(live, running.agents) : t().agentsCount(running.agents)}
           </Text>
         )}
       </Box>
@@ -402,7 +409,7 @@ function terminal({ Box, Text }: Pick<Elements['terminal'], 'Box' | 'Text'>, l: 
         const w = atHead(p)
         const pct = percent(p, w)
         const filled = Math.round(pct / 5)
-        const step = p.state === 'done' ? 'fertig' : (p.stages[w.stage]?.steps[w.step - 1]?.title ?? '')
+        const step = p.state === 'done' ? t().doneWord : (p.stages[w.stage]?.steps[w.step - 1]?.title ?? '')
         return (
           <Box key={p.id} flexDirection="column">
             <Text>

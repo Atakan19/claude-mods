@@ -28,6 +28,7 @@ import {
   twigSvg,
   weatherOf,
 } from './look'
+import { t } from './i18n'
 import { elapsed } from './progress'
 import {
   PANE,
@@ -55,17 +56,16 @@ import {
 
 // Finished work stays on its branch this long, pale, then leaves the tree.
 const KEEP_MS = 3 * 60e3
-const DAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 // Session first; the others hold a place until their content is settled.
-const TABS = [
-  { key: 'session', label: 'Session' },
-  { key: 'agents', label: 'Agents' },
-  { key: 'files', label: 'Dateien' },
-  { key: 'history', label: 'Verlauf' },
-]
+const TABS = ['session', 'agents', 'files', 'history'].map(key => ({ key, get label() { return t().tabs[key]! } }))
 const GOAL = '#e0a030'
-const ROLE_NAME: Record<Role, string> = { explorer: 'Explore', designer: 'Designer', tester: 'Tester', reviewer: 'Reviewer', builder: 'Builder', writer: 'Schreiber', guide: 'Guide', plain: 'Agent' }
-const MOOD = { running: ['läuft', C.agent], waiting: ['wartet auf dich', C.warn], done: ['fertig', C.ok], error: ['Fehler', C.alert] } as const
+const roleName = (role: Role) => t().roles[role]!
+const MOOD = {
+  running: () => [t().running, C.agent] as const,
+  waiting: () => [t().waitsForYou, C.warn] as const,
+  done: () => [t().doneWord, C.ok] as const,
+  error: () => [t().error, C.alert] as const,
+}
 const FILE_COLOR: Record<GitFile['status'], string> = { M: C.warn, A: C.ok, D: C.alert, R: C.shell, '?': C.ok }
 
 const capital = (s: string) => (s ? `${s[0]!.toUpperCase()}${s.slice(1)}` : s)
@@ -74,7 +74,7 @@ const paneTitle = (l: Live | null) => (l ? `${modelName(l.model)}${l.effort ? ` 
 
 // Called from the one session.start hook in data.ts.
 export async function startPane($: EngineInterface) {
-  await $.command.register({ name: 'cockpit', description: 'Open the cockpit pane' })
+  await $.command.register({ name: 'cockpit', description: t().openPane })
   void $.ui.open({ id: PANE, title: paneTitle(await getLive($)) })
 }
 
@@ -92,7 +92,7 @@ const isRecent = (endedAt: number | null, now: number) => endedAt === null || no
 function resetText(l: Limit, now: number) {
   if (!l.resetsAt) return ''
   const at = Date.parse(l.resetsAt)
-  return `↻ ${at - now > 20 * 3600e3 ? `${DAYS[new Date(at).getDay()]} ` : ''}${clock(at)}`
+  return `↻ ${at - now > 20 * 3600e3 ? `${t().days[new Date(at).getDay()]} ` : ''}${clock(at)}`
 }
 
 // The warning under a dial, or none while all is calm.
@@ -100,26 +100,26 @@ function resetText(l: Limit, now: number) {
 const NEW_CHAT_AT = 50
 function ctxWarning(percent: number) {
   return percent >= 90
-    ? { text: '⚠ Jetzt /compact', color: C.alert }
+    ? { text: t().compactNow, color: C.alert }
     : percent >= 75
-      ? { text: '⚠ Bald voll', color: C.warn }
+      ? { text: t().fullSoon, color: C.warn }
       : percent >= NEW_CHAT_AT
-        ? { text: 'Neuer Chat empfohlen', color: C.warn }
+        ? { text: t().newChat, color: C.warn }
         : null
 }
 function limitWarning(l: Limit, now: number) {
   const tone = paceOf(l, now)
-  return tone === 'alert' ? { text: '⚠ Limit nah', color: C.alert } : tone === 'fast' ? { text: '⚠ Zu schnell', color: C.warn } : null
+  return tone === 'alert' ? { text: t().limitNear, color: C.alert } : tone === 'fast' ? { text: t().tooFast, color: C.warn } : null
 }
 
 // "⑂ feat/pane  ↑3 ↓1 gegen main  ● 5 geändert +120 −40"; the parts that are zero stay out.
 function repoLine(env: Env) {
   const drift = [env.ahead > 0 && `↑${env.ahead}`, env.behind > 0 && `↓${env.behind}`].filter(Boolean).join(' ')
   const lines = [env.added > 0 && `+${env.added}`, env.removed > 0 && `−${env.removed}`].filter(Boolean).join(' ')
-  return [env.branch && `⑂ ${env.branch}`, drift && env.branch !== env.base && `${drift} gegen ${env.base}`, env.changed > 0 && `● ${env.changed} geändert`, lines].filter(Boolean).join('  ')
+  return [env.branch && `⑂ ${env.branch}`, drift && env.branch !== env.base && `${drift} ${t().against(env.base)}`, env.changed > 0 && `● ${t().changedCount(env.changed)}`, lines].filter(Boolean).join('  ')
 }
 
-const tallyLine = (t: { turns: number; tools: number }) => `${t.turns} ${t.turns === 1 ? 'Turn' : 'Turns'} · ${t.tools} ${t.tools === 1 ? 'Tool' : 'Tools'}`
+const tallyLine = (n: { turns: number; tools: number }) => `${t().turns(n.turns)} · ${t().tools(n.tools)}`
 
 // What hangs off the session: the task list, the background work, the chats it started.
 function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: Subchat[], goals: Goal[], now: number): Group[] {
@@ -129,13 +129,13 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
     const active = goals.filter(g => g.endedAt === null).length
     groups.push({
       key: 'goals',
-      title: 'Ziele',
-      count: active > 0 ? `${active} aktiv` : 'beendet',
+      title: t().goals,
+      count: active > 0 ? t().activeCount(active) : t().ended,
       color: GOAL,
       leaves: goals.map((g, i) => ({
         key: `g-${i}`,
         title: g.condition,
-        sub: g.endedAt === null ? `${g.by === 'you' ? 'von dir' : 'von Claude'} · ${now - g.at < 60e3 ? 'gerade eben' : `seit ${span(now - g.at)}`}` : 'beendet',
+        sub: g.endedAt === null ? `${g.by === 'you' ? t().byYou : t().byClaude} · ${now - g.at < 60e3 ? t().justNow : t().since(span(now - g.at))}` : t().ended,
         time: '',
         state: g.endedAt === null ? 'running' : 'done',
         color: GOAL,
@@ -146,14 +146,14 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
     const done = plan.steps.filter(s => s.status === 'completed').length
     groups.push({
       key: 'plan',
-      title: 'Aufgaben',
+      title: t().tasks,
       count: `${done}/${plan.steps.length}`,
       color: C.chat,
       current: plan.steps.find(s => s.status === 'in_progress')?.title,
       leaves: plan.steps.map(s => ({
         key: `p-${s.id}`,
         title: s.title,
-        sub: s.status === 'completed' ? 'fertig' : s.status === 'in_progress' ? 'läuft' : 'offen',
+        sub: s.status === 'completed' ? t().doneWord : s.status === 'in_progress' ? t().running : t().open,
         time: s.startedAt && (s.endedAt ?? now) - s.startedAt >= 1000 ? elapsed((s.endedAt ?? now) - s.startedAt) : '',
         state: s.status === 'completed' ? 'done' : s.status === 'in_progress' ? 'running' : 'pending',
         color: C.chat,
@@ -165,7 +165,7 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
     .map(a => ({
       key: `a-${a.id}`,
       title: a.description,
-      sub: [a.type, a.model && modelName(a.model), a.state === 'running' || a.state === 'waiting' ? a.tool : a.state === 'error' ? 'Fehler' : 'fertig'].filter(Boolean).join(' · '),
+      sub: [a.type, a.model && modelName(a.model), a.state === 'running' || a.state === 'waiting' ? a.tool : a.state === 'error' ? t().error : t().doneWord].filter(Boolean).join(' · '),
       time: elapsed((a.endedAt ?? now) - a.startedAt),
       state: a.state,
       color: C.agent,
@@ -175,7 +175,7 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
     .map(s => ({
       key: `s-${s.id}`,
       title: s.title,
-      sub: s.endedAt === null ? 'Shell' : 'Shell · fertig',
+      sub: s.endedAt === null ? t().shell : t().shellDone,
       time: elapsed((s.endedAt ?? now) - s.startedAt),
       state: s.endedAt === null ? 'running' : 'done',
       color: C.shell,
@@ -183,15 +183,15 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
   const background = [...cmds, ...agents]
   if (background.length > 0) {
     const live = background.filter(l => l.state === 'running' || l.state === 'waiting').length
-    groups.push({ key: 'bg', title: 'Hintergrund', count: live > 0 ? `${live} laufen` : 'fertig', color: C.shell, leaves: background })
+    groups.push({ key: 'bg', title: t().background, count: live > 0 ? t().runningCount(live) : t().doneWord, color: C.shell, leaves: background })
   }
   if (chats.length > 0) {
     groups.push({
       key: 'chats',
-      title: 'Subchats',
+      title: t().subchats,
       count: String(chats.length),
       color: C.seven_day,
-      leaves: chats.map((c, i) => ({ key: `c-${i}`, title: c.title, sub: 'eigener Chat · gestartet', time: `vor ${span(now - c.at)}`, state: 'chat', color: C.seven_day })),
+      leaves: chats.map((c, i) => ({ key: `c-${i}`, title: c.title, sub: t().ownChat, time: t().ago(span(now - c.at)), state: 'chat', color: C.seven_day })),
     })
   }
   return groups
@@ -234,38 +234,38 @@ const ageOf = (age: string) =>
     .replace(/ years?/, ' J')
 
 function agentsTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, roster: AgentRow[], folded: string[], now: number) {
-  if (roster.length === 0) return <Text dimColor>Noch keine Agents in dieser Session.</Text>
+  if (roster.length === 0) return <Text dimColor>{t().noAgents}</Text>
   const live = (a: AgentRow) => a.state === 'running' || a.state === 'waiting'
   const list = [...roster].sort((a, b) => Number(live(b)) - Number(live(a)) || b.startedAt - a.startedAt)
   return (
     <Box flexDirection="column" rowGap={1}>
       {list.map(a => {
         const role = roleOf(a.type, a.description)
-        const [word, color] = MOOD[a.state]
+        const [word, color] = MOOD[a.state]()
         return (
           <Box key={a.id} flexDirection="row" columnGap={1} alignItems="flex-start" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
-            <Svg source={clawdSvg(role, a.state)} alt={`${ROLE_NAME[role]}, ${word}`} width={CLAWD.w * 0.7} height={CLAWD.h * 0.7} />
+            <Svg source={clawdSvg(role, a.state)} alt={`${roleName(role)}, ${word}`} width={CLAWD.w * 0.7} height={CLAWD.h * 0.7} />
             {/* The text is the switch: a press folds the details open; the ring says the state. */}
             <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
               <Button key={`agent-${a.id}`} plain onPress={() => void toggleFold($, `agent-${a.id}`)}>
                 <Text bold>{a.description}</Text>
                 {'\n'}
-                <Text dimColor>{[role === 'plain' ? a.type : ROLE_NAME[role], a.model && modelName(a.model), elapsed((a.endedAt ?? now) - a.startedAt)].filter(Boolean).join(' · ')}</Text>
+                <Text dimColor>{[role === 'plain' ? a.type : roleName(role), a.model && modelName(a.model), elapsed((a.endedAt ?? now) - a.startedAt)].filter(Boolean).join(' · ')}</Text>
                 {'\n'}
                 <Text color={a.state === 'waiting' ? C.warn : a.state === 'error' ? C.alert : undefined} dimColor={a.state === 'done'}>
-                  {a.state === 'done' ? `${a.tools ?? 0} Tools` : a.tool}
+                  {a.state === 'done' ? t().tools(a.tools ?? 0) : a.tool}
                 </Text>
               </Button>
               {folded.includes(`agent-${a.id}`) && (
                 <Box flexDirection="column" marginTop={1}>
-                  <Fact Box={Box} Text={Text} name="Typ" value={a.type} />
-                  <Fact Box={Box} Text={Text} name="Modell" value={[a.model && modelName(a.model), a.effort].filter(Boolean).join(' · ') || '–'} />
-                  <Fact Box={Box} Text={Text} name="Gestartet" value={clock(a.startedAt)} />
-                  <Fact Box={Box} Text={Text} name={a.endedAt === null ? 'Läuft seit' : 'Dauer'} value={elapsed((a.endedAt ?? now) - a.startedAt)} />
-                  <Fact Box={Box} Text={Text} name="Tools" value={String(a.tools ?? 0)} />
-                  <Fact Box={Box} Text={Text} name="Zuletzt" value={a.tool || '–'} />
+                  <Fact Box={Box} Text={Text} name={t().type} value={a.type} />
+                  <Fact Box={Box} Text={Text} name={t().model} value={[a.model && modelName(a.model), a.effort].filter(Boolean).join(' · ') || '–'} />
+                  <Fact Box={Box} Text={Text} name={t().started} value={clock(a.startedAt)} />
+                  <Fact Box={Box} Text={Text} name={a.endedAt === null ? t().runsFor : t().duration} value={elapsed((a.endedAt ?? now) - a.startedAt)} />
+                  <Fact Box={Box} Text={Text} name={t().toolsWord} value={String(a.tools ?? 0)} />
+                  <Fact Box={Box} Text={Text} name={t().last} value={a.tool || '–'} />
                   <Button key={`agent-view-${a.id}`} plain onPress={() => void $.ui.view({ agentId: a.id }).catch(() => undefined)}>
-                    <Text color={C.chat}>Unterhaltung öffnen →</Text>
+                    <Text color={C.chat}>{t().openChat}</Text>
                   </Button>
                 </Box>
               )}
@@ -284,7 +284,7 @@ function filesTab($: EngineInterface, { Box, Text, Button }: DesktopUi, changed:
   const isReadOpen = folded.includes('files-read-open')
   const added = changed.reduce((n, c) => n + c.added, 0)
   const removed = changed.reduce((n, c) => n + c.removed, 0)
-  if (changed.length === 0 && reads.length === 0) return <Text dimColor>Diese Session hat noch keine Datei angefasst.</Text>
+  if (changed.length === 0 && reads.length === 0) return <Text dimColor>{t().noFiles}</Text>
   // One line per file: a dot in the change's color, the name, its folder dim; nothing for what is empty.
   const row = (key: string, dot: string, path: string, right: RenderElement[]) => (
     <Box key={key} flexDirection="row" columnGap={1}>
@@ -303,7 +303,7 @@ function filesTab($: EngineInterface, { Box, Text, Button }: DesktopUi, changed:
       {changed.length > 0 && (
         <Box flexDirection="column" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
           <Box flexDirection="row" columnGap={1}>
-            <Text bold>Geändert</Text>
+            <Text bold>{t().changed}</Text>
             <Text dimColor>{changed.length}</Text>
             <Box flexGrow={1} />
             {added > 0 && <Text color={C.ok}>+{added}</Text>}
@@ -342,7 +342,7 @@ function filesTab($: EngineInterface, { Box, Text, Button }: DesktopUi, changed:
         <Box flexDirection="column" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
           <Box flexDirection="row" columnGap={1}>
             <Button key="files-read" plain onPress={() => void toggleFold($, 'files-read-open')}>
-              <Text bold>Gelesen</Text>{' '}
+              <Text bold>{t().read}</Text>{' '}
               <Text dimColor>
                 {reads.length} {isReadOpen ? '▴' : '▾'}
               </Text>
@@ -372,19 +372,19 @@ function filesTab($: EngineInterface, { Box, Text, Button }: DesktopUi, changed:
 // A prompt's opening for the history. The app hands some turns in itself, wrapped in tags: a command,
 // a message from an agent, a notice from the background. Those read as words, not markup.
 function promptLine(prompt: string | undefined) {
-  if (!prompt) return 'Turn'
+  if (!prompt) return t().turn
   const command = /<command-name>\/?([^<]+)<\/command-name>/.exec(prompt)
   if (command) return `/${command[1]!.trim()}`
-  if (prompt.startsWith('<agent-message')) return 'Nachricht von einem Agent'
-  if (prompt.startsWith('<task-notification')) return 'Meldung aus dem Hintergrund'
-  if (prompt.startsWith('<')) return prompt.replace(/<[^>]*>/g, '').trim() || 'Meldung der App'
+  if (prompt.startsWith('<agent-message')) return t().fromAgent
+  if (prompt.startsWith('<task-notification')) return t().fromBackground
+  if (prompt.startsWith('<')) return prompt.replace(/<[^>]*>/g, '').trim() || t().fromApp
   return prompt
 }
 
 // Verlauf: a dot per turn with the prompt's opening, events in between, the newest last; the last 15.
 function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: SessionEvent[]) {
   const rows = [...turns.map(t => ({ at: t.at, turn: t })), ...events.map(e => ({ at: e.at, event: e }))].sort((a, b) => a.at - b.at).slice(-15)
-  if (rows.length === 0) return <Text dimColor>Der Verlauf beginnt mit dem ersten fertigen Turn.</Text>
+  if (rows.length === 0) return <Text dimColor>{t().noHistory}</Text>
   return (
     <Box flexDirection="column">
       {rows.map((row, i) => (
@@ -405,7 +405,7 @@ function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: Sessio
           ) : (
             <Box flexDirection="row" columnGap={1} flexShrink={1}>
               <Text bold color={C.warn}>
-                {'event' in row && row.event?.kind === 'compact' ? '⇣ Compact' : '⇄ Modell'}
+                {'event' in row && row.event?.kind === 'compact' ? t().compactEvent : t().modelEvent}
               </Text>
               <Text dimColor wrap="truncate-end">
                 {'event' in row ? row.event?.note : ''}
@@ -418,11 +418,18 @@ function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: Sessio
   )
 }
 
-export function registerPane(on: On) {
+// What the person switched on in /config; fixed per load, as a change of options reloads the module.
+let SHOW = { rings: true, repo: true, tabs: TABS }
+type PaneOptions = { paneRings?: unknown; paneRepo?: unknown; tabAgents?: unknown; tabFiles?: unknown; tabHistory?: unknown }
+
+export function registerPane(on: On, options: PaneOptions = {}) {
+  const off = { agents: options.tabAgents === false, files: options.tabFiles === false, history: options.tabHistory === false } as Record<string, boolean>
+  SHOW = { rings: options.paneRings !== false, repo: options.paneRepo !== false, tabs: TABS.filter(tab => !off[tab.key]) }
+
   on('command.run', { command: 'cockpit' }, async $ => {
     await $.ui.open({ id: PANE, title: paneTitle(await getLive($)) })
 
-    return { text: 'Cockpit geöffnet.' }
+    return { text: t().opened }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
@@ -432,7 +439,9 @@ export function registerPane(on: On) {
     const running = await getRunning($)
     const tally = { ...done, turns: done.turns + (running.tools > 0 ? 1 : 0), tools: done.tools + running.tools }
     const folded = await getFolded($)
-    const tab = await getTab($)
+    // A tab switched off falls back to Session.
+    const stored = await getTab($)
+    const tab = SHOW.tabs.some(x => x.key === stored) ? stored : 'session'
     const env = await getEnv($)
     const plan = await getPlan($)
     const crew = await getCrew($)
@@ -450,7 +459,7 @@ export function registerPane(on: On) {
 
     if (e.surface === 'desktop') {
       const { Box, Text, Svg, Button } = $.ui.resolve(e)
-      if (!l) return <Text dimColor>Wartet auf die erste Antwort…</Text>
+      if (!l) return <Text dimColor>{t().waitingFirst}</Text>
       const badges: Record<string, { text: string; color: string } | null> = {
         agents: liveAgents > 0 ? { text: String(liveAgents), color: C.agent } : null,
         files: changedFiles.length > 0 ? { text: String(changedFiles.length), color: C.shell } : null,
@@ -462,15 +471,15 @@ export function registerPane(on: On) {
             source={toggleSvg(
               Math.max(
                 0,
-                TABS.findIndex(t => t.key === tab),
+                SHOW.tabs.findIndex(x => x.key === tab),
               ),
-              TABS.length,
+              SHOW.tabs.length,
             )}
             alt="Tabs"
             height={TOGGLE_H}
           />
           <Box position="absolute" top={0} bottom={0} left={0} right={0} flexDirection="row" alignItems="center">
-            {TABS.map(t => {
+            {SHOW.tabs.map(t => {
               const badge = badges[t.key] ?? null
               return (
                 <Box key={t.key} flexGrow={1} width="25%" flexDirection="row" justifyContent="center" alignItems="flex-start">
@@ -538,7 +547,7 @@ export function registerPane(on: On) {
                 <Text>{fact}</Text>
               </Box>
             ))}
-            {d.parts && d.parts.length > 0 && <Svg source={partsSvg(d.parts)} alt="Aufteilung" height={8} />}
+            {d.parts && d.parts.length > 0 && <Svg source={partsSvg(d.parts)} alt={t().parts} height={8} />}
             {d.parts?.map((part, i) => (
               <Box key={part.name} flexDirection="row">
                 <Text color={PART_COLORS[i % PART_COLORS.length]}>■ </Text>
@@ -552,8 +561,7 @@ export function registerPane(on: On) {
           </Box>
         </Box>
       )
-      const PACE = { calm: 'ruhig', fast: 'zu schnell', alert: 'kritisch' } as const
-      const limitDial = (lim: Limit, label: string, calm: string): Dial => {
+            const limitDial = (lim: Limit, label: string, calm: string): Dial => {
         const gone = elapsedOf(lim, now)
         const at = lim.resetsAt ? Date.parse(lim.resetsAt) : null
         return {
@@ -566,10 +574,10 @@ export function registerPane(on: On) {
           pace: gone,
           warning: limitWarning(lim, now),
           facts: [
-            ['Verbraucht', `${Math.round(lim.percentUsed)} %`],
-            ...(gone !== null ? [[lim.kind === 'five_hour' ? 'Fenster vorbei' : 'Woche vorbei', `${Math.round(gone)} %`] as [string, string]] : []),
-            ['Tempo', PACE[paceOf(lim, now)]],
-            ...(at !== null ? [['Reset', `${resetText(lim, now).replace('↻ ', '')} · in ${span(at - now)}`] as [string, string]] : []),
+            [t().used, `${Math.round(lim.percentUsed)} %`],
+            ...(gone !== null ? [[lim.kind === 'five_hour' ? t().windowGone : t().weekGone, `${Math.round(gone)} %`] as [string, string]] : []),
+            [t().tempo, t().pace[paceOf(lim, now)]!],
+            ...(at !== null ? [[t().reset, t().inTime(resetText(lim, now).replace('↻ ', ''), span(at - now))] as [string, string]] : []),
           ],
         }
       }
@@ -577,7 +585,7 @@ export function registerPane(on: On) {
       // The repo card's details: the last commits, whether they are pushed, what is not committed.
       const repoDetails = (env: Env) => (
         <Box flexDirection="column" marginTop={1}>
-          <Text dimColor>Letzte Commits</Text>
+          <Text dimColor>{t().lastCommits}</Text>
           {env.commits.map(c => (
             <Box key={c.hash} flexDirection="row" columnGap={1}>
               <Text dimColor mono>
@@ -589,8 +597,8 @@ export function registerPane(on: On) {
               <Text dimColor>{ageOf(c.age)}</Text>
             </Box>
           ))}
-          {env.unpushed === null ? <Text dimColor>Kein Upstream-Branch</Text> : env.unpushed === 0 ? <Text color={C.ok}>● gepusht</Text> : <Text color={C.warn}>↑{env.unpushed} nicht gepusht</Text>}
-          {env.files.length > 0 && <Text dimColor>Nicht committet</Text>}
+          {env.unpushed === null ? <Text dimColor>{t().noUpstream}</Text> : env.unpushed === 0 ? <Text color={C.ok}>{t().pushed}</Text> : <Text color={C.warn}>{t().unpushed(env.unpushed)}</Text>}
+          {env.files.length > 0 && <Text dimColor>{t().uncommitted}</Text>}
           {env.files.slice(0, 6).map(file => (
             <Box key={file.path} flexDirection="row" columnGap={1}>
               <Text color={FILE_COLOR[file.status]}>{file.status}</Text>
@@ -601,7 +609,7 @@ export function registerPane(on: On) {
               {file.removed > 0 && <Text color={C.alert}>−{file.removed}</Text>}
             </Box>
           ))}
-          {env.files.length > 6 && <Text dimColor>… {env.files.length - 6} weitere</Text>}
+          {env.files.length > 6 && <Text dimColor>{t().more(env.files.length - 6)}</Text>}
         </Box>
       )
 
@@ -612,17 +620,17 @@ export function registerPane(on: On) {
           color: l.ctxPercent >= 90 ? C.alert : l.ctxPercent >= 75 ? C.warn : C.context,
           value: l.ctxTokens > 0 ? k(l.ctxTokens) : '–',
           label: 'Context',
-          sub: l.ctxTokens > 0 ? `${w.glyph} ${w.word}` : 'misst…',
+          sub: l.ctxTokens > 0 ? `${w.glyph} ${t().weather[w.icon]}` : t().measuring,
           // The tick on the context ring: where a new chat is advised.
           pace: NEW_CHAT_AT,
           paceColor: C.warn,
           warning: ctxWarning(l.ctxPercent),
           facts: [
-            ['Belegt', `${k(l.ctxTokens)} von ${k(l.ctxWindow)}`],
-            ['Anteil', `${Math.round(l.ctxPercent)} %`],
-            ['Frei', k(Math.max(0, l.ctxWindow - l.ctxTokens))],
-            ['Wetter', `${w.glyph} ${w.word}`],
-            ['Neuer Chat', `ab ${NEW_CHAT_AT} %`],
+            [t().filled, t().ofTotal(k(l.ctxTokens), k(l.ctxWindow))],
+            [t().share, `${Math.round(l.ctxPercent)} %`],
+            [t().free, k(Math.max(0, l.ctxWindow - l.ctxTokens))],
+            [t().weatherWord, `${w.glyph} ${t().weather[w.icon]}`],
+            [t().newChatAt, t().fromPercent(NEW_CHAT_AT)],
           ],
           ...(l.ctxParts ? { parts: l.ctxParts.slice(0, 6) } : {}),
         },
@@ -635,9 +643,9 @@ export function registerPane(on: On) {
           {/* Shown top down as rings, repo, tabs, but laid out the other way round: the tabs' names lie on a layer
               of their own, which would cover anything before it, so the rings and their cards come last. */}
           <Box flexDirection="column-reverse" rowGap={1}>
-            {tabs}
+            {SHOW.tabs.length > 1 && tabs}
 
-            {env?.repo && (
+            {SHOW.repo && env?.repo && (
               <Box flexDirection="row" columnGap={1} alignItems="flex-start" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
                 <Svg source={repoSvg(env.isGithub, '#ececec')} alt={env.isGithub ? 'GitHub' : 'Git'} width={20} height={20} />
                 {/* A button holds only text, so the card's two lines are the switch, not its logo or margins. */}
@@ -650,8 +658,8 @@ export function registerPane(on: On) {
                     {env.branch !== '' && <Text dimColor>⑂ {env.branch} </Text>}
                     {env.branch !== env.base && env.ahead > 0 && <Text color={C.ok}>↑{env.ahead} </Text>}
                     {env.branch !== env.base && env.behind > 0 && <Text color={C.warn}>↓{env.behind} </Text>}
-                    {env.branch !== env.base && env.ahead + env.behind > 0 && <Text dimColor>gegen {env.base} </Text>}
-                    {env.changed > 0 && <Text dimColor>· ● {env.changed} geändert </Text>}
+                    {env.branch !== env.base && env.ahead + env.behind > 0 && <Text dimColor>{t().against(env.base)} </Text>}
+                    {env.changed > 0 && <Text dimColor>· ● {t().changedCount(env.changed)} </Text>}
                     {env.added > 0 && <Text color={C.ok}>+{env.added} </Text>}
                     {env.removed > 0 && <Text color={C.alert}>−{env.removed}</Text>}
                   </Button>
@@ -660,7 +668,7 @@ export function registerPane(on: On) {
               </Box>
             )}
 
-            <Box flexDirection="row">{dials.map(dial)}</Box>
+            {SHOW.rings && <Box flexDirection="row">{dials.map(dial)}</Box>}
           </Box>
 
           {tab === 'agents' && agentsTab($, { Box, Text, Svg, Button }, roster, folded, now)}
@@ -669,15 +677,15 @@ export function registerPane(on: On) {
           {tab === 'session' && (
             <Box flexDirection="column" rowGap={1}>
               <Box flexDirection="row" columnGap={1} alignItems="center">
-                <Svg source={coreSvg('#ececec')} alt="Diese Session" width={18} height={18} />
-                <Text bold>Diese Session</Text>
+                <Svg source={coreSvg('#ececec')} alt={t().thisSession} width={18} height={18} />
+                <Text bold>{t().thisSession}</Text>
                 <Box flexGrow={1} />
                 <Text dimColor>
                   {tallyLine(tally)}
                   {since !== null && ` · ${elapsed(now - since)}`}
                 </Text>
               </Box>
-              {groups.length === 0 && <Text dimColor>Nichts läuft nebenher.</Text>}
+              {groups.length === 0 && <Text dimColor>{t().nothingAside}</Text>}
               {/* Each group runs on a line of its own: a dot at its name, a twig into each card. */}
               {groups.map(g => (
                 <Box key={g.key} flexDirection="column">
@@ -691,7 +699,7 @@ export function registerPane(on: On) {
                   {!folded.includes(g.key) &&
                     g.leaves.map((leaf, i) => (
                       <Box key={leaf.key} flexDirection="row" alignItems="center">
-                        <Svg source={twigSvg(i === g.leaves.length - 1, g.color)} alt="Zweig" width={TWIG.w} height={TWIG.leaf} />
+                        <Svg source={twigSvg(i === g.leaves.length - 1, g.color)} alt={t().branch} width={TWIG.w} height={TWIG.leaf} />
                         <Box flexDirection="row" flexGrow={1} flexShrink={1} columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
                           <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.sub} width={RING} height={RING} />
                           <Box flexDirection="column" flexShrink={1}>
@@ -717,7 +725,7 @@ export function registerPane(on: On) {
 
     // Terminal: the same parts as text.
     const { Box, Text } = $.ui.resolve(e)
-    if (!l) return <Text dimColor>Wartet auf die erste Antwort…</Text>
+    if (!l) return <Text dimColor>{t().waitingFirst}</Text>
     const w = Math.max(10, Math.min(24, e.props.bodyColumns - 24))
     const leaves = groups.flatMap(g => g.leaves.map(leaf => ({ g, leaf })))
 
@@ -745,7 +753,7 @@ export function registerPane(on: On) {
         </Box>
         <Box flexDirection="column">
           <Text>
-            <Text bold>● Diese Session</Text>
+            <Text bold>● {t().thisSession}</Text>
             <Text dimColor> · {tallyLine(tally)}</Text>
           </Text>
           {env?.repo && (

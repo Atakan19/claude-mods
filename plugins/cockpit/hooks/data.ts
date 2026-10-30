@@ -5,12 +5,13 @@ import { cacheLeft, cacheTtlMs, k, modelName, span } from './format'
 import { retitlePane, startPane } from './pane'
 import { clearDonePlan } from './plan'
 import { FOLD_MS } from './progress'
+import { chooseLang, setLang, t } from './i18n'
 import { play } from './sound'
 import { addEvent, addGoal, addShell, addSubchat, addTouch, addTurn, endGoals, bumpTick, countAgent, dropDoneCrew, endShells, getCrew, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
 
 type Reading = Pick<SessionUsage, 'context' | 'rateLimits' | 'cost'>
 
-const ALERT = { done: 'Claude ist fertig', decision: 'Claude wartet auf dich', error: 'Claude ist gescheitert' } as const
+const ALERT = { done: () => t().done, decision: () => t().decision, error: () => t().failed } as const
 
 const base = (path: string) => path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? path
 
@@ -108,7 +109,7 @@ async function noteShell($: EngineInterface, description: string | undefined, id
 async function alert($: EngineInterface, kind: keyof typeof ALERT, sounds: boolean, toasts: boolean) {
   if (sounds) play($, kind)
   if (!toasts) return
-  $.ui.toast(ALERT[kind], { timeoutMs: 10_000 })
+  $.ui.toast(ALERT[kind](), { timeoutMs: 10_000 })
 }
 
 // What fills the context, counted locally ('summary': no request is made).
@@ -124,7 +125,7 @@ async function apply($: EngineInterface, u: Reading, toasts: boolean, extra: Par
   const five = limits.find(l => l.kind === 'five_hour')
   const prevFive = prev?.limits.find(l => l.kind === 'five_hour')
   if (toasts && five && five.percentUsed >= 90 && (prevFive?.percentUsed ?? 0) < 90) {
-    $.ui.toast(`5h-Limit bei ${Math.round(five.percentUsed)} %`)
+    $.ui.toast(t().fiveHourAt(Math.round(five.percentUsed)))
   }
   await setLive($, p => ({
     ctxTokens: u.context.tokens ?? p?.ctxTokens ?? 0,
@@ -139,16 +140,16 @@ async function apply($: EngineInterface, u: Reading, toasts: boolean, extra: Par
 }
 
 // The one source every part draws from: usage, turns, running tools and agents.
-export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boolean) {
+export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boolean, language: unknown) {
   let turnStart = { ctx: 0, cost: 0, tools: 0, prompt: '' }
   let cacheWarned = false
 
   on('session.start', async ($, e, next) => {
-    // Until the first turn names the model, the settings' choice ("opus") stands in.
-    const model = await $.settings.read().then(
-      s => s.model,
-      () => undefined,
-    )
+    // Until the first turn names the model, the settings' choice ("opus") stands in; their
+    // `language` sets the cockpit's, unless its own option names one.
+    const settings = await $.settings.read().catch(() => ({}) as Record<string, unknown>)
+    const model = settings.model
+    setLang(chooseLang(language, settings.language))
     const known = (await getLive($))?.model
     await apply($, await $.session.usage(), toasts, known || typeof model !== 'string' ? {} : { model })
     $.clock.every(30_000, () => {
@@ -159,7 +160,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
         const left = cacheLeft(l, await $.clock.now())
         if (left !== null && left > 0 && left <= 5 * 60e3) {
           cacheWarned = true
-          $.ui.toast(`Cache läuft in ${span(left)} ab (${k(l.ctxTokens)} Context)`)
+          $.ui.toast(t().cacheSoon(span(left), k(l.ctxTokens)))
         }
       })()
     })
@@ -220,7 +221,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     const r = await next(e)
     try {
       if (e.agentId === undefined && !('skip' in r)) {
-        await addEvent($, { at: await $.clock.now(), kind: 'compact', note: `${e.trigger === 'manual' ? '/compact' : 'automatisch'} bei ${k(before)}` })
+        await addEvent($, { at: await $.clock.now(), kind: 'compact', note: t().compactBy(e.trigger === 'manual', k(before)) })
       }
     } catch {}
     return r

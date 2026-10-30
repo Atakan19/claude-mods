@@ -9,10 +9,10 @@ import { registerSpinner } from './spinner'
 
 // Wiring only: each part lives in its own file and can be switched off in /config.
 export const register: Register = (on, options) => {
-  registerData(on, options.toasts !== false, options.pane !== false, options.sounds !== false)
+  registerData(on, options.toasts !== false, options.pane !== false, options.sounds !== false, options.language)
   if (options.plan !== false) registerPlan(on)
-  if (options.band !== false) registerBand(on)
-  if (options.pane !== false) registerPane(on)
+  if (options.band !== false) registerBand(on, options)
+  if (options.pane !== false) registerPane(on, options)
   if (options.replyLine !== false) registerReply(on)
   if (options.spinner !== false) registerSpinner(on)
 }

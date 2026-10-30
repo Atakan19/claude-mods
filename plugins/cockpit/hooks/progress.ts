@@ -2,6 +2,8 @@
 // the code below is taken from https://github.com/zycck/claude-mods (MIT, Copyright (c) 2026
 // Kirill Serditov; see NOTICE), cut to the desktop drawing. Only the glue at the end is ours.
 
+import { t } from './i18n'
+
 export type StepStatus = 'pending' | 'active' | 'done' | 'error' | 'skipped'
 export type PlanSubstep = { title: string; status: StepStatus }
 // doneAt: when the step was finished, so a checkpoint can tell how long it took
@@ -523,7 +525,7 @@ function drawTrack(p: Plan, W: number, now = 0): Track {
       done ? `<path d="${ICON_PATH.done}" transform="translate(-6 5) scale(.5)" fill="none" stroke="${INK}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>` : `<text x="0" y="${H / 2 + 4.2}" text-anchor="middle" class="kt">${label}</text>`
     }`
   } else {
-    const name = done ? (p.endedAt ? elapsed(p.endedAt - p.startedAt) : 'Done') : single ? (p.stages[0]?.name ?? 'Tasks') : (p.stages[w.stage]?.name ?? '')
+    const name = done ? (p.endedAt ? elapsed(p.endedAt - p.startedAt) : t().plainDone) : single ? (p.stages[0]?.name ?? t().plainTasks) : (p.stages[w.stage]?.name ?? '')
     // the pill carries the stage name and, past a thin line, the step at its place (the fill and the percent
     // already say how far along it is); folded agents stay folded, the pill does not count them
     const iconW = icon ? 16 : 0
@@ -821,8 +823,8 @@ function stripsSvg(v: { shown: AgentRun[]; hidden: AgentRun[] }, all: AgentRun[]
   if (v.hidden.length > 0) {
     const y = v.shown.length === 0 ? 5 : STRIP_GAP
     const doneCount = v.hidden.filter(a => a.state === 'done').length
-    const more = plural(v.hidden.length, 'more agent')
-    const moreText = stripW(`${more} · ${doneCount} done`) <= SW - 14 ? `${more} · ${doneCount} done` : fitStrip(more, SW - 14)
+    const more = t().moreAgents(v.hidden.length)
+    const moreText = stripW(`${more} · ${t().doneCount(doneCount)}`) <= SW - 14 ? `${more} · ${t().doneCount(doneCount)}` : fitStrip(more, SW - 14)
     rows.push({
       key: '+',
       height: y + STRIP_H,

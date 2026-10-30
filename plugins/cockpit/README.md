@@ -12,7 +12,37 @@ The session's numbers in one calm place. Grey while all is well; yellow or red o
 | Spinner | the working line | tool calls so far this turn |
 | Toasts | in the chat | Claude done, waiting for you, or failed (with or without sound); 5 minutes before the cache lapses; the 5h limit reaching 90% |
 
-Each part can be switched off in `/config`.
+## Settings
+
+Every part can be switched off on its own in `/config` (or under `pluginConfigs.cockpit` in your settings), so you keep only what you want: just the pane, just the band, or a band without the cache pill.
+
+| Option | Default | What it switches |
+| --- | --- | --- |
+| `language` | `auto` | `de` or `en`; `auto` follows Claude Code's own `language` setting, then your system's language. Anything other than German reads English |
+| `band` | on | the band above the prompt |
+| `pillContext`, `pillLimit`, `pillCache`, `pillAgents` | on | the band's four pills, one by one |
+| `plan` | on | Claude's task list as a progress bar |
+| `pane` | on | the pane beside the chat |
+| `paneRings`, `paneRepo` | on | the pane's rings and its repository card |
+| `tabAgents`, `tabFiles`, `tabHistory` | on | the pane's tabs; with only Session left, the switch disappears |
+| `replyLine` | on | the line under each reply |
+| `spinner` | on | the tool count in the working line |
+| `sounds`, `toasts` | on | the sound and the toast when Claude is done, waits or fails |
+
+## Make it yours
+
+Each part lives in a file of its own under `hooks/`, so a change stays in one place:
+
+| File | Holds |
+| --- | --- |
+| `register.tsx` | the wiring: which part runs under which option |
+| `i18n.ts` | every word shown, in German and English; add a language by adding a table |
+| `band.tsx`, `pills.ts`, `progress.ts` | the band, its pills, the plan bars and agent strips |
+| `pane.tsx` | the pane and its tabs |
+| `look.ts`, `clawd.ts` | colors and drawings: rings, tree, Clawd's outfits |
+| `data.ts`, `state.ts` | what is read from Claude Code and kept for the session |
+
+`claude plugin test .` runs the tests; `claude --plugin-dir .` loads your copy in a session.
 
 ## Limits
 

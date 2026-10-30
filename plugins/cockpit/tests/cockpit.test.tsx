@@ -7,7 +7,7 @@ const USAGE = {
   cost: { usd: 1.25 },
 }
 
-test('band and reply line show one turn', async ($, on) => {
+test('band and reply line show one turn', { options: { language: 'de' } }, async ($, on) => {
   mock.clock(on, { now: 1_000_000 })
   on('command.register', () => ({ value: { command: 'cockpit' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -118,4 +118,42 @@ test('band and reply line show one turn', async ($, on) => {
   })
   expect(await other.find({ type: 'Text', text: /⏱/ })).toBeFalsy()
   await other.unmount()
+})
+
+test('English, with a tab and a pill switched off', { options: { language: 'en', tabFiles: false, pillCache: false } }, async ($, on) => {
+  mock.clock(on, { now: 1_000_000 })
+  on('command.register', () => ({ value: { command: 'cockpit' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('session.usage', () => ({ value: USAGE }))
+  on('settings.read', () => ({ value: { model: 'opus' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.cwd', () => ({ value: '/work' }))
+  on('session.repo', () => ({ value: null }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', () => ({ text: '' }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine</Text>
+  })
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'hi', turnId: 't1' })
+  await $.turn.complete({ answer: 'Done.', durationMs: 2_000, isAborted: false, turnId: 't1', reason: 'answer' })
+
+  const props = { title: 'Cockpit', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } as const
+  const pane = await $.ui.mount({ plugin: 'cockpit', component: 'Pane', requestId: 'cockpit', surface: 'desktop', props })
+  expect(await pane.find({ type: 'Text', text: 'This session' })).toBeTruthy()
+  expect(await pane.find({ type: 'Button', key: 'tab-history' })).toBeTruthy()
+  expect(await pane.find({ type: 'Button', key: 'tab-files' })).toBeFalsy()
+  await pane.unmount()
+
+  const band = await $.ui.mount({
+    plugin: 'cockpit',
+    component: 'AbovePrompt',
+    surface: 'desktop',
+    props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} },
+  })
+  const alts = (await band.findAll({ type: 'Svg' })).map(s => String(s.props.alt))
+  expect(alts).not.toContain('Cache')
+  expect(alts.some(a => a.startsWith('5h limit'))).toBe(true)
+  await band.unmount()
 })

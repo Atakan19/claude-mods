@@ -13,11 +13,11 @@ export const CACHE_SOON = 10 * MINUTE
 export const GOOD_HIT = 90
 
 export const FORECAST = [
-  { upTo: 25, id: 'clear', icon: '☀', color: 'yellow', word: 'Klar' },
-  { upTo: 50, id: 'cloudy', icon: '☁', color: 'cyan', word: 'Bewölkt' },
-  { upTo: 75, id: 'showers', icon: '☂', color: 'blue', word: 'Schauer' },
-  { upTo: 90, id: 'storm', icon: '☇', color: 'magenta', word: 'Gewitter' },
-  { upTo: Infinity, id: 'compact', icon: '↯', color: 'red', word: 'Bald kompaktieren' },
+  { upTo: 25, id: 'clear', icon: '☀', color: 'yellow' },
+  { upTo: 50, id: 'cloudy', icon: '☁', color: 'cyan' },
+  { upTo: 75, id: 'showers', icon: '☂', color: 'blue' },
+  { upTo: 90, id: 'storm', icon: '☇', color: 'magenta' },
+  { upTo: Infinity, id: 'compact', icon: '↯', color: 'red' },
 ] as const
 export type Forecast = (typeof FORECAST)[number]
 export const forecastFor = (percent: number): Forecast => FORECAST.find(b => percent < b.upTo) ?? FORECAST[FORECAST.length - 1]!
