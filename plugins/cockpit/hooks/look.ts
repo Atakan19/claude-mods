@@ -111,7 +111,12 @@ export function beadsSvg(items: { state: RingState; color: string }[]) {
         ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.alert}" stroke-width="2.2"/>`
         : state === 'pending'
           ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.twig}" stroke-width="1.8" stroke-dasharray="2.6 2.6"/>`
-          : `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${state === 'waiting' ? C.warn : color}" stroke-width="2.2"/><circle cx="${x}" cy="${c}" r="2.2" fill="${state === 'waiting' ? C.warn : color}"/>`
+          : state === 'waiting'
+            ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.warn}" stroke-width="2.2"/><circle cx="${x}" cy="${c}" r="2.2" fill="${C.warn}"/>`
+            : // Running turns like the big ring: an arc on a pale track.
+              `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.track}" stroke-width="2.2"/>` +
+              `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="13 40"><animateTransform attributeName="transform" type="rotate" from="0 ${x} ${c}" to="360 ${x} ${c}" dur="1.4s" repeatCount="indefinite"/></circle>` +
+              `<circle cx="${x}" cy="${c}" r="2.2" fill="${color}"/>`
   return svg(beadsWidth(items.length), BEAD, items.map((it, i) => one(it.state, it.color, c + i * (BEAD + BEAD_GAP))).join(''))
 }
 // In front of a card: down from the line above, round into the card; the group's last one stops there.
