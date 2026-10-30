@@ -180,7 +180,7 @@ export function toggleSvg(open: number, count: number) {
 
 // The history's line: a dot per row, filled in its color, hollow for an event; the line runs on unless it is the last row.
 // Each row's drawing is as tall as its row, so the line runs through.
-export const STEP = { w: 22, turn: 46, file: 28 }
+export const STEP = { w: 22, turn: 44, file: 28 }
 export function stepSvg(height: number, color: string, isHollow: boolean, isLast: boolean) {
   const x = 9
   const y = 12

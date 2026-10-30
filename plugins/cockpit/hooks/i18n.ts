@@ -99,7 +99,6 @@ const de = {
   duration: 'Dauer',
   toolsWord: 'Tools',
   last: 'Zuletzt',
-  openChat: 'Unterhaltung öffnen →',
   // pane: files
   noFiles: 'Diese Session hat noch keine Datei angefasst.',
   changed: 'Geändert',
@@ -218,7 +217,6 @@ const en: typeof de = {
   duration: 'Duration',
   toolsWord: 'Tools',
   last: 'Last',
-  openChat: 'Open conversation →',
   noFiles: 'This session has not touched a file yet.',
   changed: 'Changed',
   read: 'Read',

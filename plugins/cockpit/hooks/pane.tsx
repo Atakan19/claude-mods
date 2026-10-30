@@ -283,9 +283,6 @@ function agentsTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, ro
                   <Fact Box={Box} Text={Text} name={a.endedAt === null ? t().runsFor : t().duration} value={elapsed((a.endedAt ?? now) - a.startedAt)} />
                   <Fact Box={Box} Text={Text} name={t().toolsWord} value={String(a.tools ?? 0)} />
                   <Fact Box={Box} Text={Text} name={t().last} value={a.tool || '–'} />
-                  <Button key={`agent-view-${a.id}`} plain onPress={() => void $.ui.view({ agentId: a.id }).catch(() => undefined)}>
-                    <Text color={C.chat}>{t().openChat}</Text>
-                  </Button>
                 </Box>
               )}
             </Box>
@@ -404,10 +401,10 @@ function foldAppTurns(turns: Turn[]): Turn[] {
 // Verlauf: one feed, newest first: turns with a bar as long as they took, what the tools did to files and who
 // (you or an agent's Clawd), and the compactions and model changes in between; the last 40.
 type FeedRow = { at: number; turn?: Turn; file?: Activity; event?: SessionEvent }
-function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: SessionEvent[], activity: Activity[], roster: AgentRow[]) {
+function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: SessionEvent[], activity: Activity[], roster: AgentRow[], limit = 40) {
   const rows: FeedRow[] = [...foldAppTurns(turns).map(turn => ({ at: turn.at, turn })), ...activity.map(file => ({ at: file.at, file })), ...events.map(event => ({ at: event.at, event }))]
     .sort((a, b) => b.at - a.at)
-    .slice(0, 40)
+    .slice(0, limit)
   if (rows.length === 0) return <Text dimColor>{t().noHistory}</Text>
   const longest = Math.max(1, ...rows.map(r => r.turn?.seconds ?? 0))
   const who = (id: string | undefined) => roster.find(a => a.id === id)
@@ -417,7 +414,7 @@ function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: Sessio
       {rows.map((row, i) => {
         const isLast = i === rows.length - 1
         const time = (
-          <Box width={5}>
+          <Box width={5} flexShrink={0}>
             <Text dimColor>{clock(row.at)}</Text>
           </Box>
         )
@@ -435,17 +432,22 @@ function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: Sessio
                       {promptLine(turn.prompt)}
                     </Text>
                   </Box>
-                  <Text dimColor>{elapsed(turn.seconds * 1000)}</Text>
+                  <Box flexShrink={0}>
+                    <Text dimColor>{elapsed(turn.seconds * 1000)}</Text>
+                  </Box>
                 </Box>
-                <Svg
-                  source={durationSvg(turn.seconds / longest, turn.cacheHit > 0 && turn.cacheHit < 70 ? C.warn : isApp ? C.track : C.chat)}
-                  alt={`${t().tools(turn.tools)} · +${k(turn.ctxDelta)}`}
-                  height={5}
-                />
-                <Text dimColor wrap="truncate-end">
-                  {t().tools(turn.tools)} · +{k(turn.ctxDelta)}
-                  {turn.cacheHit > 0 ? t().cache(turn.cacheHit) : ''}
-                </Text>
+                {/* Second line: the bar as long as the turn took, its figures after it. */}
+                <Box flexDirection="row" columnGap={1} alignItems="center">
+                  <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                    <Svg source={durationSvg(turn.seconds / longest, turn.cacheHit > 0 && turn.cacheHit < 70 ? C.warn : isApp ? C.track : C.chat)} alt={elapsed(turn.seconds * 1000)} height={5} />
+                  </Box>
+                  <Box flexShrink={0}>
+                    <Text dimColor>
+                      {t().tools(turn.tools)} · +{k(turn.ctxDelta)}
+                      {turn.cacheHit > 0 ? t().cache(turn.cacheHit) : ''}
+                    </Text>
+                  </Box>
+                </Box>
               </Box>
             </Box>
           )
@@ -558,6 +560,7 @@ export function registerPane(on: On, options: PaneOptions = {}) {
     const changedFiles = filesOf(env, touches)
     const turns = await getTurns($)
     const events = await getEvents($)
+    const activity = await getActivity($)
     const repoOpen = await getRepoOpen($)
     const groups = groupsOf(plan, crew, await getShells($), await getSubchats($), await getGoals($), await $.clock.now())
     await getTick($)
@@ -810,38 +813,17 @@ export function registerPane(on: On, options: PaneOptions = {}) {
                   {since !== null && ` · ${elapsed(now - since)}`}
                 </Text>
                 {SHOW.history && <Button key="open-history" plain dimColor label="🕘" onPress={() => void toggleFold($, 'history-pop')} />}
-                {/* The 🕘 folds a small card open under it: the last turns, and the way to the whole history. */}
-                {SHOW.history && folded.includes('history-pop') && (
-                  <Box
-                    position="absolute"
-                    top={2}
-                    right={0}
-                    width={Math.min(44, e.props.bodyColumns - 2)}
-                    flexDirection="column"
-                    paddingX={1}
-                    backgroundColor={C.popup}
-                    borderStyle="round"
-                    borderColor={C.line}
-                  >
-                    <Text bold>{t().historyTitle}</Text>
-                    {foldAppTurns(turns).length === 0 && <Text dimColor>{t().noHistory}</Text>}
-                    {foldAppTurns(turns)
-                      .slice(-5)
-                      .map((turn, i) => (
-                        <Box key={`${turn.at}-${i}`} flexDirection="row" columnGap={1}>
-                          <Text dimColor>{clock(turn.at)}</Text>
-                          <Box flexGrow={1} flexShrink={1} minWidth={0}>
-                            <Text wrap="truncate-end">{promptLine(turn.prompt)}</Text>
-                          </Box>
-                          <Text dimColor>{elapsed(turn.seconds * 1000)}</Text>
-                        </Box>
-                      ))}
-                    <Button key="history-all" plain onPress={() => void openHistory($)}>
-                      <Text color={C.chat}>{t().showAll}</Text>
-                    </Button>
-                  </Box>
-                )}
               </Box>
+              {/* The 🕘 folds a small card open under the line, in the flow, so nothing cuts it off: the newest of the same feed. */}
+              {SHOW.history && folded.includes('history-pop') && (
+                <Box flexDirection="column" paddingX={1} backgroundColor={C.popup} borderStyle="round" borderColor={C.line}>
+                  <Text bold>{t().historyTitle}</Text>
+                  {historyTab({ Box, Text, Svg, Button }, turns, events, activity, roster, 6)}
+                  <Button key="history-all" plain onPress={() => void openHistory($)}>
+                    <Text color={C.chat}>{t().showAll}</Text>
+                  </Button>
+                </Box>
+              )}
               {groups.length === 0 && <Text dimColor>{t().nothingAside}</Text>}
               {/* Each group runs on a line of its own: a dot at its name, a twig into each card. */}
               {groups.map(g => (

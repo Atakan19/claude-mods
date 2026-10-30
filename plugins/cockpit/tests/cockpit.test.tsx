@@ -105,7 +105,7 @@ test('band and reply line show one turn', { options: { language: 'de' } }, async
   // An agent's card folds its details open.
   await pane.press({ key: 'tab-agents' })
   await pane.press({ key: 'agent-a1' })
-  expect(await pane.find({ type: 'Text', text: /Unterhaltung öffnen/ })).toBeTruthy()
+  expect(await pane.find({ type: 'Text', text: 'Gestartet' })).toBeTruthy()
   await pane.unmount()
 
   const reply = await $.ui.mount({
