@@ -34,6 +34,10 @@ export type Env = {
 }
 export type GitFile = { path: string; status: 'M' | 'A' | 'D' | 'R' | '?'; added: number; removed: number }
 
+// One thing a tool did to a file, for the history: when, which, what, how many lines, and by whom
+// (an agent's id; none for the main conversation). Lines are counted from the tool's arguments.
+export type Activity = { at: number; path: string; kind: 'read' | 'edit' | 'write'; added: number; removed: number; by?: string }
+
 // A file this session read or changed, from the tools' arguments only.
 export type Touch = { path: string; kind: 'read' | 'edit'; count: number; at: number }
 
@@ -105,6 +109,7 @@ declare module 'claude-code' {
       subchats: Subchat[]
       roster: AgentRow[]
       touches: Touch[]
+      activity: Activity[]
       events: SessionEvent[]
       goals: Goal[]
       repoOpen: boolean

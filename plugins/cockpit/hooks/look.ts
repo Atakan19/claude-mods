@@ -178,14 +178,46 @@ export function toggleSvg(open: number, count: number) {
   )
 }
 
-// The history's line: a dot per turn (filled) or event (hollow, amber); the line runs on unless it is the last row.
-export const STEP = { w: 22, h: 46 }
-export function stepSvg(kind: 'turn' | 'event', isLast: boolean) {
+// The history's line: a dot per row, filled in its color, hollow for an event; the line runs on unless it is the last row.
+// Each row's drawing is as tall as its row, so the line runs through.
+export const STEP = { w: 22, turn: 46, file: 28 }
+export function stepSvg(height: number, color: string, isHollow: boolean, isLast: boolean) {
   const x = 9
-  const y = 14
-  const line = `<path d="M${x} 0V${isLast ? y : STEP.h}" ${stroke('#8a8a8a')}/>`
-  const dot = kind === 'turn' ? `<circle cx="${x}" cy="${y}" r="4.5" fill="#6a6a6a"/>` : `<circle cx="${x}" cy="${y}" r="4.5" fill="#1f1f1f" stroke="${C.warn}" stroke-width="1.6"/>`
-  return svg(STEP.w, STEP.h, line + dot)
+  const y = 12
+  const line = `<path d="M${x} 0V${isLast ? y : height}" ${stroke('#8a8a8a')}/>`
+  const dot = isHollow ? `<circle cx="${x}" cy="${y}" r="4" fill="#1f1f1f" stroke="${color}" stroke-width="1.6"/>` : `<circle cx="${x}" cy="${y}" r="4" fill="${color}"/>`
+  return svg(STEP.w, height, line + dot)
+}
+
+// A turn's length as a bar, stretched over the row; the share is of the longest turn shown.
+export const durationSvg = (share: number, color: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="5" viewBox="0 0 1000 5" preserveAspectRatio="none"><rect width="1000" height="5" rx="2.5" fill="${C.track}"/><rect width="${Math.max(20, 1000 * Math.min(1, share)).toFixed(0)}" height="5" rx="2.5" fill="${color}"/></svg>`
+
+// The Files tab's drawings: a folder, a file's type, GitHub's five squares, the twig from folder to file.
+export const folderSvg = (color: string) =>
+  svg(16, 14, `<path d="M1 3a1 1 0 0 1 1-1h4l2 2h6a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z" fill="${color}" fill-opacity=".25" stroke="${color}" stroke-width="1.2"/>`)
+const EXT: Record<string, [string, string]> = { ts: ['TS', '#3178c6'], tsx: ['TSX', '#3178c6'], js: ['JS', '#c9a227'], jsx: ['JSX', '#c9a227'], json: ['{ }', '#c9a227'], md: ['MD', '#8a8a8a'], py: ['PY', '#3fa66b'], css: ['CSS', '#8b6fe0'], html: ['HTML', '#d97757'] }
+export const EXT_BADGE = { w: 30, h: 16 }
+export function extSvg(name: string) {
+  const [label, color] = EXT[name.split('.').pop()?.toLowerCase() ?? ''] ?? ['·', '#8a8a8a']
+  return svg(
+    EXT_BADGE.w,
+    EXT_BADGE.h,
+    `<rect x=".5" y=".5" width="29" height="15" rx="4" fill="${color}" fill-opacity=".12" stroke="${color}" stroke-opacity=".4"/><text x="15" y="11.5" text-anchor="middle" fill="${color}" font-size="9" font-weight="700" font-family="Consolas, monospace">${esc(label)}</text>`,
+  )
+}
+export const SQUARES = { w: 43, h: 8 }
+export function squaresSvg(added: number, removed: number) {
+  const n = added + removed || 1
+  const green = Math.round((5 * added) / n)
+  const red = Math.min(5 - green, Math.round((5 * removed) / n))
+  const cell = (i: number) => `<rect x="${i * 9}" width="7" height="7" rx="1.5" fill="${i < green ? C.ok : i < green + red ? C.alert : C.track}"/>`
+  return svg(SQUARES.w, SQUARES.h, [0, 1, 2, 3, 4].map(cell).join(''))
+}
+export const FILE_TWIG = { w: 22, h: 28 }
+export function fileTwigSvg(isLast: boolean, color: string) {
+  const { w, h } = FILE_TWIG
+  return svg(w, h, `<path d="M8 0V${h / 2 - 7}q0 7 7 7H${w}" ${stroke(color)}/>${isLast ? '' : `<path d="M8 ${h / 2}V${h}" ${stroke(color)}/>`}`)
 }
 
 // The context's parts as one bar, stretched over the card's width.

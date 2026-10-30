@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { AgentRow, Env, Goal, Live, Plan, Running, SessionEvent, Shell, Subchat, Touch, Turn } from '../types'
+import type { Activity, AgentRow, Env, Goal, Live, Plan, Running, SessionEvent, Shell, Subchat, Touch, Turn } from '../types'
 
 export const PANE = 'cockpit'
 // The history, opened as a dialog from the pane.
@@ -30,6 +30,7 @@ const subchats = atom({ plugin: 'cockpit', key: 'subchats' } as const, [])
 // Every agent of the session for the Agents tab; the band's crew forgets finished batches.
 const roster = atom({ plugin: 'cockpit', key: 'roster' } as const, [])
 const touches = atom({ plugin: 'cockpit', key: 'touches' } as const, [])
+const activity = atom({ plugin: 'cockpit', key: 'activity' } as const, [])
 const events = atom({ plugin: 'cockpit', key: 'events' } as const, [])
 const goals = atom({ plugin: 'cockpit', key: 'goals' } as const, [])
 // Whether the repo card's details are folded open.
@@ -48,6 +49,12 @@ export async function addTouch($: EngineInterface, path: string, kind: Touch['ki
     const rest = list.filter(t => t !== old)
     return [...rest, { path, kind, count: (old?.count ?? 0) + 1, at }].slice(-100)
   })
+}
+export async function getActivity($: EngineInterface) {
+  return read($, activity)
+}
+export async function addActivity($: EngineInterface, row: Activity) {
+  await update($, activity, list => [...list, row].slice(-80))
 }
 export async function getEvents($: EngineInterface) {
   return read($, events)

@@ -1,12 +1,20 @@
 import type { Elements, EngineInterface, On, RenderElement } from 'claude-code'
 
-import type { AgentRow, Env, GitFile, Goal, Limit, Live, Plan, SessionEvent, Shell, Subchat, Touch, Turn } from '../types'
+import type { Activity, AgentRow, Env, GitFile, Goal, Limit, Live, Plan, SessionEvent, Shell, Subchat, Touch, Turn } from '../types'
 import { bar, clock, elapsedOf, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
 import type { Role } from './clawd'
 import { CLAWD, clawdSvg, roleOf } from './clawd'
 import {
   BEAD,
+  EXT_BADGE,
+  FILE_TWIG,
+  SQUARES,
+  durationSvg,
+  extSvg,
+  fileTwigSvg,
+  folderSvg,
+  squaresSvg,
   C,
   PART_COLORS,
   STEP,
@@ -32,6 +40,7 @@ import { t } from './i18n'
 import { elapsed } from './progress'
 import {
   HISTORY,
+  getActivity,
   PANE,
   getCrew,
   getEnv,
@@ -288,91 +297,75 @@ function agentsTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, ro
   )
 }
 
-// Dateien: what changed, by folder, and what was only read, folded until asked.
-function filesTab($: EngineInterface, { Box, Text, Button }: DesktopUi, changed: FileRow[], touches: Touch[], folded: string[], now: number) {
+// Dateien: a summary, then the changed files by folder, each on a twig like the session's tree, and what was only read, folded.
+function filesTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, changed: FileRow[], touches: Touch[], folded: string[], now: number) {
   const reads = touches.filter(t => t.kind === 'read' && !changed.some(c => c.path === t.path || t.path.endsWith(c.path))).sort((a, b) => b.at - a.at)
-  const isReadOpen = folded.includes('files-read-open')
-  const added = changed.reduce((n, c) => n + c.added, 0)
-  const removed = changed.reduce((n, c) => n + c.removed, 0)
   if (changed.length === 0 && reads.length === 0) return <Text dimColor>{t().noFiles}</Text>
-  // One line per file: a dot in the change's color, the name, its folder dim; nothing for what is empty.
-  const row = (key: string, dot: string, path: string, right: RenderElement[]) => (
-    <Box key={key} flexDirection="row" columnGap={1}>
-      <Text color={dot}>●</Text>
-      <Text wrap="truncate-end">{nameOf(path)}</Text>
-      <Box flexGrow={1} flexShrink={1} minWidth={0}>
-        <Text dimColor wrap="truncate-start">
-          {dirOf(path)}
-        </Text>
-      </Box>
-      {right}
-    </Box>
-  )
+  const isReadOpen = folded.includes('files-read-open')
+  const sum = (list: FileRow[]) => [list.reduce((n, c) => n + c.added, 0), list.reduce((n, c) => n + c.removed, 0)] as const
+  const [added, removed] = sum(changed)
+  const dirs = [...new Set(changed.map(c => dirOf(c.path)))].sort()
   return (
     <Box flexDirection="column" rowGap={1}>
-      {changed.length > 0 && (
-        <Box flexDirection="column" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
-          <Box flexDirection="row" columnGap={1}>
-            <Text bold>{t().changed}</Text>
-            <Text dimColor>{changed.length}</Text>
-            <Box flexGrow={1} />
-            {added > 0 && <Text color={C.ok}>+{added}</Text>}
-            {removed > 0 && <Text color={C.alert}>−{removed}</Text>}
+      <Box flexDirection="row" columnGap={1}>
+        <Text bold>{t().changedFiles(changed.length)}</Text>
+        {added > 0 && <Text color={C.ok}>+{added}</Text>}
+        {removed > 0 && <Text color={C.alert}>−{removed}</Text>}
+        <Box flexGrow={1} />
+        {reads.length > 0 && <Text dimColor>{t().readCount(reads.length)}</Text>}
+      </Box>
+      {dirs.map(dir => {
+        const list = changed.filter(c => dirOf(c.path) === dir)
+        const [a, d] = sum(list)
+        return (
+          <Box key={dir || '.'} flexDirection="column">
+            <Box flexDirection="row" columnGap={1} alignItems="center">
+              <Svg source={folderSvg(C.shell)} alt={dir || '.'} width={16} height={14} />
+              <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                <Text bold wrap="truncate-start">
+                  {dir === '' ? '.' : dir}
+                </Text>
+              </Box>
+              {a > 0 && <Text color={C.ok}>+{a}</Text>}
+              {d > 0 && <Text color={C.alert}>−{d}</Text>}
+            </Box>
+            {list.map((c, i) => (
+              <Box key={c.path} flexDirection="row" columnGap={1} alignItems="center">
+                <Svg source={fileTwigSvg(i === list.length - 1, C.shell)} alt={t().branch} width={FILE_TWIG.w} height={FILE_TWIG.h} />
+                <Svg source={extSvg(c.path)} alt={c.status} width={EXT_BADGE.w} height={EXT_BADGE.h} />
+                <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                  <Text wrap="truncate-end">{nameOf(c.path)}</Text>
+                </Box>
+                <Svg source={squaresSvg(c.added, c.removed)} alt={`+${c.added} −${c.removed}`} width={SQUARES.w} height={SQUARES.h} />
+                <Box width={7} justifyContent="flex-end">
+                  <Text dimColor>{c.at !== null ? span(now - c.at) : ''}</Text>
+                </Box>
+              </Box>
+            ))}
           </Box>
-          {[...changed]
-            .sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
-            .map(c =>
-              row(c.path, FILE_COLOR[c.status], c.path, [
-                ...(c.added > 0
-                  ? [
-                      <Text key="a" color={C.ok}>
-                        +{c.added}
-                      </Text>,
-                    ]
-                  : []),
-                ...(c.removed > 0
-                  ? [
-                      <Text key="r" color={C.alert}>
-                        −{c.removed}
-                      </Text>,
-                    ]
-                  : []),
-                ...(c.at !== null
-                  ? [
-                      <Text key="t" dimColor>
-                        {span(now - c.at)}
-                      </Text>,
-                    ]
-                  : []),
-              ]),
-            )}
-        </Box>
-      )}
+        )
+      })}
       {reads.length > 0 && (
-        <Box flexDirection="column" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
-          <Box flexDirection="row" columnGap={1}>
-            <Button key="files-read" plain onPress={() => void toggleFold($, 'files-read-open')}>
-              <Text bold>{t().read}</Text>{' '}
-              <Text dimColor>
-                {reads.length} {isReadOpen ? '▴' : '▾'}
-              </Text>
-            </Button>
-          </Box>
+        <Box flexDirection="column">
+          <Button key="files-read" plain dimColor onPress={() => void toggleFold($, 'files-read-open')}>
+            <Text dimColor>
+              {isReadOpen ? '▾' : '▸'} {t().read} · {reads.map(r => nameOf(r.path)).join(', ')}
+            </Text>
+          </Button>
           {isReadOpen &&
-            reads.map(r =>
-              row(
-                r.path,
-                C.twig,
-                r.path,
-                r.count > 1
-                  ? [
-                      <Text key="n" dimColor>
-                        {r.count}×
-                      </Text>,
-                    ]
-                  : [],
-              ),
-            )}
+            reads.map(r => (
+              <Box key={r.path} flexDirection="row" columnGap={1} paddingLeft={2}>
+                <Text dimColor wrap="truncate-end">
+                  {nameOf(r.path)}
+                </Text>
+                <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                  <Text dimColor wrap="truncate-start">
+                    {dirOf(r.path)}
+                  </Text>
+                </Box>
+                {r.count > 1 && <Text dimColor>{r.count}×</Text>}
+              </Box>
+            ))}
         </Box>
       )}
     </Box>
@@ -408,39 +401,86 @@ function foldAppTurns(turns: Turn[]): Turn[] {
   return out.map(t => (t.n ? { ...t, prompt: kindOf(t) === 'agent' ? `<agents ${t.n}>` : `<notices ${t.n}>` } : t))
 }
 
-// Verlauf: a dot per turn with the prompt's opening, events in between, the newest last; the last 15.
-function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: SessionEvent[]) {
-  const rows = [...foldAppTurns(turns).map(t => ({ at: t.at, turn: t })), ...events.map(e => ({ at: e.at, event: e }))].sort((a, b) => a.at - b.at).slice(-15)
+// Verlauf: one feed, newest first: turns with a bar as long as they took, what the tools did to files and who
+// (you or an agent's Clawd), and the compactions and model changes in between; the last 40.
+type FeedRow = { at: number; turn?: Turn; file?: Activity; event?: SessionEvent }
+function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: SessionEvent[], activity: Activity[], roster: AgentRow[]) {
+  const rows: FeedRow[] = [...foldAppTurns(turns).map(turn => ({ at: turn.at, turn })), ...activity.map(file => ({ at: file.at, file })), ...events.map(event => ({ at: event.at, event }))]
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 40)
   if (rows.length === 0) return <Text dimColor>{t().noHistory}</Text>
+  const longest = Math.max(1, ...rows.map(r => r.turn?.seconds ?? 0))
+  const who = (id: string | undefined) => roster.find(a => a.id === id)
+  const fileColor = (f: Activity) => (f.kind === 'read' ? '#6a6a6a' : f.kind === 'write' ? C.ok : C.warn)
   return (
     <Box flexDirection="column">
-      {rows.map((row, i) => (
-        <Box key={`${row.at}-${i}`} flexDirection="row" columnGap={1}>
+      {rows.map((row, i) => {
+        const isLast = i === rows.length - 1
+        const time = (
           <Box width={5}>
             <Text dimColor>{clock(row.at)}</Text>
           </Box>
-          <Svg source={stepSvg('turn' in row ? 'turn' : 'event', i === rows.length - 1)} alt="" width={STEP.w} height={STEP.h} />
-          {'turn' in row && row.turn ? (
-            <Box flexDirection="column" flexShrink={1}>
-              <Text wrap="truncate-end">{promptLine(row.turn.prompt)}</Text>
-              <Text dimColor wrap="truncate-end">
-                {elapsed(row.turn.seconds * 1000)} · {row.turn.tools} Tools · +{k(row.turn.ctxDelta)}
-                {row.turn.cacheHit > 0 ? ' · Cache ' : ''}
-                {row.turn.cacheHit > 0 && <Text color={row.turn.cacheHit < 70 ? C.warn : undefined}>{row.turn.cacheHit}%</Text>}
-              </Text>
+        )
+        if (row.turn) {
+          const turn = row.turn
+          const isApp = Boolean(turn.prompt?.startsWith('<'))
+          return (
+            <Box key={`t${row.at}-${i}`} flexDirection="row" columnGap={1}>
+              {time}
+              <Svg source={stepSvg(STEP.turn, isApp ? '#6a6a6a' : C.chat, false, isLast)} alt={t().branch} width={STEP.w} height={STEP.turn} />
+              <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
+                <Box flexDirection="row" columnGap={1}>
+                  <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                    <Text dimColor={isApp} wrap="truncate-end">
+                      {promptLine(turn.prompt)}
+                    </Text>
+                  </Box>
+                  <Text dimColor>{elapsed(turn.seconds * 1000)}</Text>
+                </Box>
+                <Svg
+                  source={durationSvg(turn.seconds / longest, turn.cacheHit > 0 && turn.cacheHit < 70 ? C.warn : isApp ? C.track : C.chat)}
+                  alt={`${t().tools(turn.tools)} · +${k(turn.ctxDelta)}`}
+                  height={5}
+                />
+                <Text dimColor wrap="truncate-end">
+                  {t().tools(turn.tools)} · +{k(turn.ctxDelta)}
+                  {turn.cacheHit > 0 ? t().cache(turn.cacheHit) : ''}
+                </Text>
+              </Box>
             </Box>
-          ) : (
-            <Box flexDirection="row" columnGap={1} flexShrink={1}>
-              <Text bold color={C.warn}>
-                {'event' in row && row.event?.kind === 'compact' ? t().compactEvent : t().modelEvent}
-              </Text>
-              <Text dimColor wrap="truncate-end">
-                {'event' in row ? row.event?.note : ''}
-              </Text>
+          )
+        }
+        if (row.file) {
+          const f = row.file
+          const agent = who(f.by)
+          return (
+            <Box key={`f${row.at}-${i}`} flexDirection="row" columnGap={1} alignItems="center">
+              {time}
+              <Svg source={stepSvg(STEP.file, fileColor(f), false, isLast)} alt={t().branch} width={STEP.w} height={STEP.file} />
+              {agent ? <Svg source={clawdSvg(roleOf(agent.type, agent.description), 'idle')} alt={agent.description} width={22} height={19} /> : <Text dimColor>{t().you}</Text>}
+              <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                <Text wrap="truncate-end">
+                  <Text bold>{nameOf(f.path)}</Text> <Text dimColor>{t().verbs[f.kind]}</Text>
+                </Text>
+              </Box>
+              {f.added > 0 && <Text color={C.ok}>+{f.added}</Text>}
+              {f.removed > 0 && <Text color={C.alert}>−{f.removed}</Text>}
             </Box>
-          )}
-        </Box>
-      ))}
+          )
+        }
+        return (
+          <Box key={`e${row.at}-${i}`} flexDirection="row" columnGap={1} alignItems="center">
+            {time}
+            <Svg source={stepSvg(STEP.file, C.warn, true, isLast)} alt={t().branch} width={STEP.w} height={STEP.file} />
+            <Text bold color={C.warn}>
+              {row.event?.kind === 'compact' ? t().compactEvent : t().modelEvent}
+            </Text>
+            <Text dimColor wrap="truncate-end">
+              {row.event?.note ?? ''}
+            </Text>
+          </Box>
+        )
+      })}
     </Box>
   )
 }
@@ -478,7 +518,7 @@ export function registerPane(on: On, options: PaneOptions = {}) {
             <Box flexGrow={1} />
             <Button key="close-history" role="dismiss" plain dimColor label="✕" onPress={() => void $.ui.close({ id: HISTORY })} />
           </Box>
-          {historyTab({ Box, Text, Svg, Button }, turns, events)}
+          {historyTab({ Box, Text, Svg, Button }, turns, events, await getActivity($), await getRoster($))}
         </Box>
       )
     }

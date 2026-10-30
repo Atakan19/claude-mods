@@ -3,7 +3,8 @@
 import { C } from './look'
 
 export type Role = 'explorer' | 'designer' | 'tester' | 'reviewer' | 'builder' | 'writer' | 'guide' | 'plain'
-export type Mood = 'running' | 'waiting' | 'done' | 'error'
+// idle: standing still with open eyes, for the small figures in the history.
+export type Mood = 'running' | 'waiting' | 'done' | 'error' | 'idle'
 
 // The role from the agent's type and description, by words only; no tokens.
 const ROLE_WORDS: [Role, RegExp][] = [

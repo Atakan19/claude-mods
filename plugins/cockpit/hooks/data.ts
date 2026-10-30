@@ -7,7 +7,7 @@ import { clearDonePlan } from './plan'
 import { FOLD_MS } from './progress'
 import { chooseLang, setLang, t } from './i18n'
 import { play } from './sound'
-import { addEvent, addGoal, addShell, addSubchat, addTouch, addTurn, endGoals, bumpTick, countAgent, dropDoneCrew, endShells, getCrew, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
+import { addActivity, addEvent, addGoal, addShell, addSubchat, addTouch, addTurn, endGoals, bumpTick, countAgent, dropDoneCrew, endShells, getCrew, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
 
 type Reading = Pick<SessionUsage, 'context' | 'rateLimits' | 'cost'>
 
@@ -38,6 +38,16 @@ function filesOf(status: string, numstat: string): GitFile[] {
       const kind: GitFile['status'] = code === '??' ? '?' : code.includes('A') ? 'A' : code.includes('D') ? 'D' : code.includes('R') ? 'R' : 'M'
       return { path, status: kind, added, removed }
     })
+}
+
+// A new file's lines, as git counts them against an empty file; at most 20, so a big new folder stays quick.
+async function newLines($: EngineInterface, cwd: string, files: GitFile[]) {
+  for (const f of files.filter(f => f.status === '?').slice(0, 20)) {
+    const r = await $.process.run(['git', '-C', cwd, 'diff', '--no-index', '--numstat', '--', '/dev/null', f.path], { timeoutMs: 3000 }).catch(() => null)
+    const n = Number(r?.stdout.split('\t')[0])
+    if (Number.isFinite(n)) f.added = n
+  }
+  return files
 }
 
 // The folder, the repository as owner/name, the branch git is on, how far it is from the main branch and the files changed.
@@ -81,20 +91,27 @@ async function readEnv($: EngineInterface): Promise<Env> {
         return { hash, subject, age, files: num(/(\d+) files? changed/), added: num(/(\d+) insertion/), removed: num(/(\d+) deletion/) }
       }),
     unpushed: unpushed === '' ? null : Number(unpushed),
-    files: filesOf(status, numstat),
+    files: await newLines($, repo.root, filesOf(status, numstat)),
   }
 }
 
 // A file a tool read or changed, by its path only: the Dateien tab lists them.
 const TOUCH: Record<string, 'read' | 'edit'> = { Read: 'read', Edit: 'edit', Write: 'edit', NotebookEdit: 'edit' }
-async function noteTouch($: EngineInterface, tool: string, args: { file_path?: unknown; notebook_path?: unknown }) {
+// Lines in a string the tool was handed: only counted, never kept.
+const linesIn = (s: unknown) => (typeof s === 'string' && s !== '' ? s.split('\n').length : 0)
+type ToolArgs = { file_path?: unknown; notebook_path?: unknown; old_string?: unknown; new_string?: unknown; content?: unknown; new_source?: unknown }
+async function noteTouch($: EngineInterface, tool: string, args: ToolArgs, agentId: string | undefined) {
   const kind = TOUCH[tool]
   const file = args.file_path ?? args.notebook_path
   if (!kind || typeof file !== 'string') return
   const cwd = (await $.session.cwd()).replace(/\\/g, '/').replace(/\/$/, '')
   const p = file.replace(/\\/g, '/')
   const rel = p.toLowerCase().startsWith(`${cwd.toLowerCase()}/`) ? p.slice(cwd.length + 1) : p
-  await addTouch($, rel, kind, await $.clock.now())
+  const at = await $.clock.now()
+  await addTouch($, rel, kind, at)
+  const added = tool === 'Write' ? linesIn(args.content) : tool === 'NotebookEdit' ? linesIn(args.new_source) : linesIn(args.new_string)
+  const removed = tool === 'Edit' ? linesIn(args.old_string) : 0
+  await addActivity($, { at, path: rel, kind: tool === 'Write' ? 'write' : kind, added, removed, ...(agentId !== undefined ? { by: agentId } : {}) })
 }
 
 // Reads the repository and stores it; never throws.
@@ -341,7 +358,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     // Past a permission dialog the tool ran: the strip is no longer waiting. Caught here, so
     // the .catch below never runs the tool a second time.
     try {
-      if (!('deny' in r) && !r.isError) await noteTouch($, e.tool, e as { file_path?: unknown; notebook_path?: unknown })
+      if (!('deny' in r) && !r.isError) await noteTouch($, e.tool, e as ToolArgs, agentId)
       if (isCrew && (await getCrew($)).find(a => a.id === agentId)?.state === 'waiting') {
         await upsertCrew($, { id: agentId, state: 'running', tool: e.tool })
       }
