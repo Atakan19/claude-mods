@@ -3,7 +3,7 @@ import type { EngineInterface, On } from 'claude-code'
 import type { AgentRow, Env, Limit, Live, Plan, Shell, Subchat } from '../types'
 import { bar, clock, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
-import { C, DIAL, RING, TWIG, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
+import { BEAD, C, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
 import { elapsed } from './progress'
 import { PANE, getCrew, getEnv, getFolded, getLive, getPlan, getShells, getSubchats, getTab, getTally, getTick, setTab, toggleFold } from './state'
 
@@ -143,27 +143,17 @@ export function registerPane(on: On) {
 
     if (e.surface === 'desktop') {
       const { Box, Text, Svg, Button } = $.ui.resolve(e)
+      if (!l) return <Text dimColor>Wartet auf die erste Antwort…</Text>
+      // A segment switch across the width: the open tab lifts out of the track.
       const tabs = (
-        <Box flexDirection="row" columnGap={1}>
-          {TABS.map(t => (t.key === tab ? <Button key={t.key} plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button key={t.key} plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />))}
+        <Box flexDirection="row" backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+          {TABS.map(t => (
+            <Box key={t.key} flexGrow={1} width="25%" justifyContent="center" backgroundColor={t.key === tab ? C.segment : undefined} borderStyle="round" borderColor={t.key === tab ? C.segment : C.card}>
+              {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
+            </Box>
+          ))}
         </Box>
       )
-      if (tab !== 'session') {
-        return (
-          <Box flexDirection="column" rowGap={1} paddingX={1}>
-            {tabs}
-            <Text dimColor>Kommt bald.</Text>
-          </Box>
-        )
-      }
-      if (!l) {
-        return (
-          <Box flexDirection="column" rowGap={1} paddingX={1}>
-            {tabs}
-            <Text dimColor>Wartet auf die erste Antwort…</Text>
-          </Box>
-        )
-      }
       const five = l.limits.find(lim => lim.kind === 'five_hour')
       const seven = l.limits.find(lim => lim.kind === 'seven_day')
       const w = weatherOf(l.ctxPercent)
@@ -181,8 +171,6 @@ export function registerPane(on: On) {
 
       return (
         <Box flexDirection="column" rowGap={1} paddingX={1}>
-          {tabs}
-
           <Box flexDirection="row">
             {dial('ctx', l.ctxPercent, l.ctxPercent >= 90 ? C.alert : l.ctxPercent >= 75 ? C.warn : C.context, k(l.ctxTokens), 'Context', `${w.glyph} ${w.word}`, ctxWarning(l.ctxPercent))}
             {five && limitDial(five, '5h', C.five_hour)}
@@ -211,8 +199,10 @@ export function registerPane(on: On) {
             </Box>
           )}
 
-          <Svg source={`<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1" viewBox="0 0 1000 1" preserveAspectRatio="none"><rect width="1000" height="1" fill="${C.line}"/></svg>`} alt="Trennlinie" />
+          {tabs}
 
+          {tab !== 'session' && <Text dimColor>Kommt bald.</Text>}
+          {tab === 'session' && (
           <Box flexDirection="column" rowGap={1}>
             <Box flexDirection="row" columnGap={1} alignItems="center">
               <Svg source={coreSvg('#ececec')} alt="Diese Session" width={18} height={18} />
@@ -228,9 +218,9 @@ export function registerPane(on: On) {
             {groups.map(g => (
               <Box key={g.key} flexDirection="column">
                 <Box flexDirection="row" columnGap={1} alignItems="center">
-                  <Svg source={headSvg(g.color)} alt={g.title} width={TWIG.w} height={TWIG.head} />
+                  <Svg source={headSvg(g.color, !folded.includes(g.key))} alt={g.title} width={TWIG.w} height={TWIG.head} />
                   <Button plain dimColor label={`${folded.includes(g.key) ? '▸' : '▾'} ${g.title}`} onPress={() => void toggleFold($, g.key)} />
-                  {folded.includes(g.key) && g.current && <Text dimColor wrap="truncate-end">· {g.current}</Text>}
+                  {folded.includes(g.key) && <Svg source={beadsSvg(g.leaves)} alt={g.current ?? g.count} width={g.leaves.length * BEAD} height={BEAD} />}
                   <Box flexGrow={1} />
                   <Text dimColor>{g.count}</Text>
                 </Box>
@@ -256,6 +246,7 @@ export function registerPane(on: On) {
               </Box>
             ))}
           </Box>
+          )}
         </Box>
       )
     }
