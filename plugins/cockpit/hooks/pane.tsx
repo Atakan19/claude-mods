@@ -18,6 +18,8 @@ const TABS = [
   { key: 'verlauf', label: 'Verlauf' },
 ]
 
+const SUPERSCRIPT = '⁰¹²³⁴⁵⁶⁷⁸⁹'
+const superscript = (s: string) => s.replace(/d/g, d => SUPERSCRIPT[Number(d)]!)
 const capital = (s: string) => (s ? `${s[0]!.toUpperCase()}${s.slice(1)}` : s)
 // The pane's title bar carries the model: "Opus 5.5 (Medium)".
 const paneTitle = (l: Live | null) => (l ? `${modelName(l.model)}${l.effort ? ` (${capital(l.effort)})` : ''}` : 'Cockpit')
@@ -167,16 +169,17 @@ export function registerPane(on: On) {
             alt="Tabs"
             height={TOGGLE_H}
           />
-          <Box position="absolute" top={0} bottom={0} left={0} right={0} flexDirection="row" alignItems="center">
+          {/* Pulled up a row over the drawing, in the flow: a positioned layer would be painted over the dials' cards. */}
+          <Box marginTop={-1} flexDirection="row" alignItems="center">
             {TABS.map(t => {
               const badge = badges[t.key] ?? null
               return (
                 <Box key={t.key} flexGrow={1} width="25%" flexDirection="row" justifyContent="center" alignItems="flex-start">
                   {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
-                  {/* The count, small and set to the top: raised like an exponent. */}
+                  {/* The count in superscript digits, raised like an exponent. */}
                   {badge && (
-                    <Text size="caption" weight="bold" color={badge.color}>
-                      {badge.text}
+                    <Text weight="bold" color={badge.color}>
+                      {superscript(badge.text)}
                     </Text>
                   )}
                 </Box>
@@ -200,7 +203,7 @@ export function registerPane(on: On) {
         facts: [string, string][]
       }
       // Hovered, a dial's tile lights and a card with its details opens under it; the surface draws both, no hook
-      // runs. Tile and card share a hover scope: the cards are drawn last, so they lie over the tabs' layer.
+      // runs. Tile and card share a hover scope, so only the tile wakes the card.
       const dial = (d: Dial) => (
         <Box key={d.key} flexDirection="column" alignItems="center" width={DIAL.w + 14}>
           <Box flexDirection="column" alignItems="center" paddingX={2} borderStyle="round" borderColor={C.clear} hover={{ scope: `dial-${d.key}`, backgroundColor: C.card, borderColor: C.card }}>
@@ -208,11 +211,20 @@ export function registerPane(on: On) {
             {d.sub !== '' && <Text dimColor>{d.sub}</Text>}
             {d.warning && <Text color={d.warning.color}>{d.warning.text}</Text>}
           </Box>
-        </Box>
-      )
-      const dialCard = (d: Dial) => (
-        <Box key={d.key} flexDirection="column" width={DIAL.w + 14}>
-          <Box display="none" hover={{ scope: `dial-${d.key}`, display: 'flex' }} flexDirection="column" paddingX={1} backgroundColor={C.popup} borderStyle="round" borderColor={C.line}>
+          {/* Under the tile, centered on its dial, one cell past each side. */}
+          <Box
+            position="absolute"
+            top={7}
+            left={-1}
+            right={-1}
+            display="none"
+            hover={{ scope: `dial-${d.key}`, display: 'flex' }}
+            flexDirection="column"
+            paddingX={1}
+            backgroundColor={C.popup}
+            borderStyle="round"
+            borderColor={C.line}
+          >
             <Text bold>{d.label}</Text>
             {d.facts.map(([name, fact]) => (
               <Box key={name} flexDirection="row">
@@ -341,11 +353,6 @@ export function registerPane(on: On) {
               ))}
             </Box>
           )}
-
-          {/* The dials' cards, drawn last so they lie over every layer above; each column matches its dial's. */}
-          <Box position="absolute" top={7} left={0} right={0} paddingX={1} flexDirection="row">
-            {dials.map(dialCard)}
-          </Box>
         </Box>
       )
     }
