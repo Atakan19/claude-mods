@@ -3,11 +3,11 @@ import type { EngineInterface, On, SessionUsage } from 'claude-code'
 import type { Env, GitFile, Live, Turn } from '../types'
 import { cacheLeft, cacheTtlMs, k, modelName, span } from './format'
 import { retitlePane, startPane } from './pane'
-import { clearDonePlan } from './plan'
+import { clearDonePlan, LIST_TOOLS, startPlanTool } from './plan'
 import { FOLD_MS } from './progress'
 import { chooseLang, setLang, t } from './i18n'
 import { play } from './sound'
-import { addActivity, addEvent, addGoal, addShell, addSubchat, addTouch, addTurn, endGoals, bumpTick, countAgent, dropDoneCrew, endShells, getCrew, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
+import { addActivity, addEvent, addGoal, addShell, addSubchat, addTouch, addTurn, endGoals, bumpTick, countAgent, dropDoneCrew, endShells, countIdle, getCrew, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
 
 type Reading = Pick<SessionUsage, 'context' | 'rateLimits' | 'cost'>
 
@@ -163,7 +163,7 @@ async function apply($: EngineInterface, u: Reading, toasts: boolean, extra: Par
 }
 
 // The one source every part draws from: usage, turns, running tools and agents.
-export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boolean, language: unknown) {
+export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boolean, language: unknown, planTool = false) {
   let turnStart = { ctx: 0, cost: 0, tools: 0, prompt: '' }
   let cacheWarned = false
 
@@ -188,6 +188,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
       })()
     })
     if (pane) await startPane($)
+    if (planTool) await startPlanTool($).catch(() => {})
     // In the background: a slow repository must not hold up the session's start.
     void refreshEnv($)
 
@@ -350,6 +351,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
       turnStart.tools += 1
       await setRunning($, { tools: turnStart.tools })
       if (e.tool === 'AskUserQuestion') void alert($, 'decision', sounds, toasts)
+      if (!LIST_TOOLS.has(e.tool)) await countIdle($)
     } else if (isCrew) {
       const before = (await getCrew($)).find(a => a.id === agentId)?.tools ?? 0
       await upsertCrew($, { id: agentId, state: 'running', tool: e.tool, tools: before + 1 })

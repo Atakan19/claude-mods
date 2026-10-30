@@ -34,6 +34,7 @@ import {
   stepSvg,
   toned,
   twigSvg,
+  leafHeight,
   weatherOf,
 } from './look'
 import { t } from './i18n'
@@ -99,7 +100,8 @@ export async function retitlePane($: EngineInterface) {
   if ((await $.ui.panes()).some(p => p.id === PANE)) await $.ui.open({ id: PANE, title: paneTitle(await getLive($)) })
 }
 
-type Leaf = { key: string; title: string; sub: string; time: string; state: RingState; color: string }
+// details: the lines a press on the card's title folds open, name and value.
+type Leaf = { key: string; title: string; sub: string; time: string; state: RingState; color: string; details: [string, string][] }
 type Group = { key: string; title: string; count: string; color: string; current?: string; leaves: Leaf[] }
 
 const isRecent = (endedAt: number | null, now: number) => endedAt === null || now - endedAt < KEEP_MS
@@ -151,6 +153,11 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
         time: '',
         state: g.endedAt === null ? 'running' : 'done',
         color: GOAL,
+        details: [
+          [t().by, g.by === 'you' ? t().byYou : t().byClaude],
+          [t().started, clock(g.at)],
+          [t().status, g.endedAt === null ? t().running : t().ended],
+        ],
       })),
     })
   }
@@ -162,13 +169,20 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
       count: `${done}/${plan.steps.length}`,
       color: C.chat,
       current: plan.steps.find(s => s.status === 'in_progress')?.title,
-      leaves: plan.steps.map(s => ({
+      leaves: plan.steps.map((s, i) => ({
         key: `p-${s.id}`,
         title: s.title,
-        sub: s.status === 'completed' ? t().doneWord : s.status === 'in_progress' ? t().running : t().open,
+        // The ring shows the state; the card stays one line until it is folded open.
+        sub: '',
         time: s.startedAt && (s.endedAt ?? now) - s.startedAt >= 1000 ? elapsed((s.endedAt ?? now) - s.startedAt) : '',
         state: s.status === 'completed' ? 'done' : s.status === 'in_progress' ? 'running' : 'pending',
         color: C.chat,
+        details: [
+          [t().status, s.status === 'completed' ? t().doneWord : s.status === 'in_progress' ? t().running : t().open],
+          [t().step, `${i + 1}/${plan.steps.length}`],
+          ...(s.startedAt ? [[t().started, clock(s.startedAt)] as [string, string]] : []),
+          ...(s.startedAt ? [[s.endedAt ? t().duration : t().runsFor, elapsed((s.endedAt ?? now) - s.startedAt)] as [string, string]] : []),
+        ],
       })),
     })
   }
@@ -177,10 +191,18 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
     .map(a => ({
       key: `a-${a.id}`,
       title: a.description,
-      sub: [a.type, a.model && modelName(a.model), a.state === 'running' || a.state === 'waiting' ? a.tool : a.state === 'error' ? t().error : t().doneWord].filter(Boolean).join(' · '),
+      sub: [a.type, a.model && modelName(a.model), a.state === 'running' || a.state === 'waiting' ? a.tool : ''].filter(Boolean).join(' · '),
       time: elapsed((a.endedAt ?? now) - a.startedAt),
       state: a.state,
       color: C.agent,
+      details: [
+        ...(a.task && a.task !== a.description ? [[t().task, a.task] as [string, string]] : []),
+        [t().model, [a.model && modelName(a.model), a.effort].filter(Boolean).join(' · ') || '–'],
+        [t().started, clock(a.startedAt)],
+        [a.endedAt === null ? t().runsFor : t().duration, elapsed((a.endedAt ?? now) - a.startedAt)],
+        [t().toolsWord, String(a.tools ?? 0)],
+        [t().last, a.tool || '–'],
+      ],
     }))
   const cmds: Leaf[] = shells
     .filter(s => isRecent(s.endedAt, now))
@@ -191,6 +213,11 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
       time: elapsed((s.endedAt ?? now) - s.startedAt),
       state: s.endedAt === null ? 'running' : 'done',
       color: C.shell,
+      details: [
+        [t().started, clock(s.startedAt)],
+        [s.endedAt === null ? t().runsFor : t().duration, elapsed((s.endedAt ?? now) - s.startedAt)],
+        [t().status, s.endedAt === null ? t().running : t().doneWord],
+      ],
     }))
   const background = [...cmds, ...agents]
   if (background.length > 0) {
@@ -204,7 +231,7 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
       title: t().subchats,
       count: String(chats.length),
       color: C.seven_day,
-      leaves: chats.map((c, i) => ({ key: `c-${i}`, title: c.title, sub: t().ownChat, time: t().ago(span(now - c.at)), state: 'chat', color: C.seven_day })),
+      leaves: chats.map((c, i) => ({ key: `c-${i}`, title: c.title, sub: t().ownChat, time: t().ago(span(now - c.at)), state: 'chat', color: C.seven_day, details: [[t().started, clock(c.at)]] })),
     })
   }
   return groups
@@ -440,13 +467,10 @@ function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: Sessio
                 {/* Second line: the bar as long as the turn took, its figures after it. */}
                 <Box flexDirection="row" columnGap={1} alignItems="center">
                   <Box flexGrow={1} flexShrink={1} minWidth={0}>
-                    <Svg source={durationSvg(turn.seconds / longest, turn.cacheHit > 0 && turn.cacheHit < 70 ? C.warn : isApp ? C.track : C.chat)} alt={elapsed(turn.seconds * 1000)} height={5} />
+                    <Svg source={durationSvg(turn.seconds / longest, isApp ? C.track : C.chat)} alt={elapsed(turn.seconds * 1000)} height={5} />
                   </Box>
                   <Box flexShrink={0}>
-                    <Text dimColor>
-                      {t().tools(turn.tools)} · +{k(turn.ctxDelta)}
-                      {turn.cacheHit > 0 ? t().cache(turn.cacheHit) : ''}
-                    </Text>
+                    <Text dimColor>+{k(turn.ctxDelta)}</Text>
                   </Box>
                 </Box>
               </Box>
@@ -534,7 +558,7 @@ export function registerPane(on: On, options: PaneOptions = {}) {
             <Text key={`${turn.at}-${i}`}>
               <Text dimColor>{clock(turn.at)}</Text> {promptLine(turn.prompt)}{' '}
               <Text dimColor>
-                · {elapsed(turn.seconds * 1000)} · {t().tools(turn.tools)}
+                · {elapsed(turn.seconds * 1000)} · +{k(turn.ctxDelta)}
               </Text>
             </Text>
           ))}
@@ -555,7 +579,6 @@ export function registerPane(on: On, options: PaneOptions = {}) {
     const env = await getEnv($)
     const plan = await getPlan($)
     const crew = await getCrew($)
-    const liveAgents = crew.filter(a => a.state === 'running' || a.state === 'waiting').length
     const roster = await getRoster($)
     const touches = await getTouches($)
     const changedFiles = filesOf(env, touches)
@@ -572,7 +595,8 @@ export function registerPane(on: On, options: PaneOptions = {}) {
       const { Box, Text, Svg, Button, Link } = $.ui.resolve(e)
       if (!l) return <Text dimColor>{t().waitingFirst}</Text>
       const badges: Record<string, { text: string; color: string } | null> = {
-        agents: liveAgents > 0 ? { text: String(liveAgents), color: C.agent } : null,
+        // As the band's pill: how many the session ran, not only those running now.
+        agents: running.agents > 0 ? { text: String(running.agents), color: C.agent } : null,
         files: changedFiles.length > 0 ? { text: String(changedFiles.length), color: C.shell } : null,
       }
       // A toggle: the track and the open tab's pill are one drawing, the names lie over it.
@@ -837,24 +861,39 @@ export function registerPane(on: On, options: PaneOptions = {}) {
                     <Text dimColor>{g.count}</Text>
                   </Box>
                   {!folded.includes(g.key) &&
-                    g.leaves.map((leaf, i) => (
-                      <Box key={leaf.key} flexDirection="row" alignItems="center">
-                        <Svg source={twigSvg(i === g.leaves.length - 1, g.color)} alt={t().branch} width={TWIG.w} height={TWIG.leaf} />
-                        <Box flexDirection="row" flexGrow={1} flexShrink={1} columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
-                          <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.sub} width={RING} height={RING} />
-                          <Box flexDirection="column" flexShrink={1}>
-                            <Text dimColor={leaf.state === 'done' || leaf.state === 'pending'} wrap="truncate-end">
-                              {leaf.title}
-                            </Text>
-                            <Text dimColor wrap="truncate-end">
-                              {leaf.sub}
-                            </Text>
+                    g.leaves.map((leaf, i) => {
+                      // The title is the switch: a press folds the card's details open under it.
+                      const isOpen = folded.includes(`leaf-${leaf.key}`)
+                      const lines = 1 + (leaf.sub !== '' ? 1 : 0) + (isOpen ? leaf.details.length : 0)
+                      const rowH = leafHeight(lines)
+                      return (
+                        <Box key={leaf.key} flexDirection="row" alignItems="center">
+                          <Svg source={twigSvg(i === g.leaves.length - 1, g.color, rowH)} alt={t().branch} width={TWIG.w} height={rowH} />
+                          <Box flexDirection="row" flexGrow={1} flexShrink={1} columnGap={1} alignItems="flex-start" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+                            <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.state} width={RING} height={RING} />
+                            <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
+                              <Box flexDirection="row" columnGap={1}>
+                                <Box flexShrink={1} minWidth={0}>
+                                  <Button key={`leaf-${leaf.key}`} plain onPress={() => void toggleFold($, `leaf-${leaf.key}`)}>
+                                    <Text dimColor={leaf.state === 'done' || leaf.state === 'pending'} wrap="truncate-end">
+                                      {leaf.title}
+                                    </Text>
+                                  </Button>
+                                </Box>
+                                <Box flexGrow={1} />
+                                <Text dimColor>{leaf.time}</Text>
+                              </Box>
+                              {leaf.sub !== '' && (
+                                <Text dimColor wrap="truncate-end">
+                                  {leaf.sub}
+                                </Text>
+                              )}
+                              {isOpen && leaf.details.map(([name, value]) => <Fact key={name} Box={Box} Text={Text} name={name} value={value} />)}
+                            </Box>
                           </Box>
-                          <Box flexGrow={1} />
-                          <Text dimColor>{leaf.time}</Text>
                         </Box>
-                      </Box>
-                    ))}
+                      )
+                    })}
                 </Box>
               ))}
             </Box>

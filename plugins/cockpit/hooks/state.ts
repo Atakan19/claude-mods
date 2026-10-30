@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { Activity, AgentRow, Env, Goal, Live, Plan, Running, SessionEvent, Shell, Subchat, Touch, Turn } from '../types'
+import type { Activity, AgentRow, Env, Goal, Live, Plan, Running, SessionEvent, Shell, Subchat, ToolPlan, Touch, Turn } from '../types'
 
 export const PANE = 'cockpit'
 // The history, opened as a dialog from the pane.
@@ -16,6 +16,8 @@ const running = atom({ plugin: 'cockpit', key: 'running' } as const, { tools: 0,
 const crew = atom({ plugin: 'cockpit', key: 'crew' } as const, [], { shape: 'crew-2' })
 // Tagged: a plan stored by the earlier plan tool has another shape and reads as none.
 const plan = atom({ plugin: 'cockpit', key: 'plan' } as const, null, { shape: 'plan-2' })
+// The plans reported with the progress tool, one per id.
+const bars = atom({ plugin: 'cockpit', key: 'bars' } as const, [])
 // Bumped every 30 s so countdowns redraw without a turn.
 const tick = atom({ plugin: 'cockpit', key: 'tick' } as const, 0)
 // Tagged: an env stored before the repo card lacks its fields and reads as none.
@@ -166,6 +168,16 @@ export async function getPlan($: EngineInterface) {
 }
 export async function setPlan($: EngineInterface, fn: (prev: Plan | null) => Plan | null) {
   await update($, plan, fn)
+}
+// One more tool call of the main conversation while the list stood still.
+export async function countIdle($: EngineInterface) {
+  await update($, plan, p => (p && p.steps.some(s => s.status !== 'completed') ? { ...p, idle: (p.idle ?? 0) + 1 } : p))
+}
+export async function getBars($: EngineInterface) {
+  return read($, bars)
+}
+export async function setBars($: EngineInterface, fn: (prev: ToolPlan[]) => ToolPlan[]) {
+  await update($, bars, fn)
 }
 export async function bumpTick($: EngineInterface) {
   await update($, tick, n => n + 1)

@@ -12,6 +12,7 @@
 - 📊 **Pane** beside the chat (`/cockpit`): rings for context, 5h and 7d, your git branch, and tabs for the session tree, agents, changed files and history
 - 🧾 **Reply line** under each reply: duration, tool calls, context added, cache hit rate
 - 🔔 **Sounds and toasts** when Claude is done, needs you or fails
+- 🗂️ **Plans in stages** (optional): Claude reports bigger jobs like a release as their own bars, Build → Deploy → Verify
 - 🧩 **Every part switchable** on its own, so you keep only what you want
 
 ## Install
@@ -53,6 +54,7 @@ claude plugin install cockpit --marketplace Atakan19/claude-mods --config sounds
 | `band` | on | the band above the prompt |
 | `pillContext`, `pillLimit`, `pillCache`, `pillAgents` | on | the band's four pills, one by one |
 | `plan` | on | Claude's task list as a progress bar |
+| `planTool` | off | a progress tool for Claude: plans in stages, one bar each. Costs a few hundred tokens per request, mostly cached |
 | `pane` | on | the pane beside the chat |
 | `paneRings`, `paneRepo` | on | the pane's rings and its repository card |
 | `tabAgents`, `tabFiles` | on | the pane's tabs; with only Session left, the switch disappears |
@@ -77,7 +79,7 @@ Pills for context (weather, turn bars), the 5h limit against the clock, the prom
 
 - **Header:** the model and effort beside 'This session'; three-quarter rings for context, 5h and 7d with the value inside, a tick for how much of the window has passed (on the context ring: 50 %, where a new chat is advised), reset times, a warning when one runs short and a card of details on hover (for context: what fills it).
 - **Repository card** (in a git repository): the repository, its branch, commits ahead of and behind the main branch, files and lines changed, and on its ▾ the last commits with their size and age, whether they are pushed and what is not committed.
-- **Session tab:** the session as a tree, with its turns and tool calls: the goals set with `/goal` (only when there are any), its task list, the commands and subagents running in the background, and the chats the desktop app started from it. A ring turns while a branch runs and closes green or red, finished branches fade out after three minutes, each group folds shut with its ▾ into one row of small rings.
+- **Session tab:** the session as a tree, with its turns and tool calls: the goals set with `/goal` (only when there are any), its task list, the commands and subagents running in the background, and the chats the desktop app started from it. A ring turns while a branch runs and closes green or red, finished branches fade out after three minutes, each group folds shut with its ▾ into one row of small rings, and a press on a card's title folds its details open (status, step, start, duration; for an agent its task, model and tools).
 - **Agents tab:** every subagent of the session as Clawd, dressed for its role (explorer, designer, tester, reviewer, builder, writer, guide), walking while it runs, with a blinking ! while it waits for you.
 - **Files tab:** the files changed, by folder, each on a twig with its type, GitHub's five squares for lines added and removed, and when; the files only read, folded.
 - **History** (the 🕘 button beside 'This session' folds a small card open with the last turns; its 'show all' opens the whole history as a tab): one feed, newest first: each turn with the opening of your prompt and a bar as long as it took, what the tools did to which file and who did it (you or an agent's Clawd), and the compactions and model changes between them.
@@ -89,7 +91,9 @@ The tabs show a raised number for running agents and changed files.
 <details>
 <summary><b>Plan</b> · in the band and the pane</summary>
 
-Claude's own task list (TaskCreate/TaskUpdate, TodoWrite, or the desktop app's update_plan), read as it changes: the bar's pill shows the current step and the count right of it how many are done, the step list is in the pane; a finished plan stays until your next prompt or its ✕. No extra tool, no extra tokens.
+Claude's own task list (TaskCreate/TaskUpdate, TodoWrite, or the desktop app's update_plan), read as it changes: the bar's pill shows the current step and the count right of it how many are done, the step list is in the pane; a finished plan leaves a few seconds after its last step, and a new one brings the bar back. No extra tool, no extra tokens. When a step stays active through 15 tool calls (or 3 over ten minutes), its pill turns amber and Claude gets one line in its prompt asking to update the list if it moved on; the line goes once the list moves.
+
+With `planTool` on, Claude also gets a `progress` tool: for a job in stages it opens a bar of its own with a short label per stage (Build, Deploy, Verify), a mark between the stages and the current one in the pill, and moves it on as it works. Several can run at once, a subagent's too; a finished one folds away a few seconds later.
 
 </details>
 
@@ -138,7 +142,7 @@ claude --plugin-dir .
 
 ## Privacy
 
-Changes, blocks and sends nothing; no network requests, no files read.
+Blocks and sends nothing; no network requests, no files read. It adds to Claude's prompt only the one-line reminder while a task step hangs, and with `planTool` on its progress tool.
 
 <details>
 <summary>Exactly what it reads</summary>

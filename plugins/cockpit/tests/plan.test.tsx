@@ -1,6 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { addTask, finishPlan, fromAppPlan, fromTodos, planShare, planState, updateTask } from '../hooks/plan'
+import { addTask, finishPlan, fromAppPlan, fromTodos, fromTool, planShare, planState, stuckStep, updateTask } from '../hooks/plan'
 
 test('TodoWrite lists become a plan and keep step times', async () => {
   const a = fromTodos(null, [
@@ -86,4 +86,89 @@ test('the band shows the task list a TaskCreate call made', { options: { languag
   expect(await pane.find({ type: 'Text', text: 'Diese Session' })).toBeTruthy()
   expect(await pane.find({ type: 'Text', text: /Folien planen/ })).toBeTruthy()
   await pane.unmount()
+})
+
+test('the progress tool makes, moves and restarts a plan by id', async () => {
+  expect(fromTool(null, {}, 0)).toBe('progress: id is required, like "release".')
+  expect(typeof fromTool(null, { id: 'release', next: true }, 0)).toBe('string')
+  let p = fromTool(null, { id: 'release', title: 'Release pipeline', steps: ['Build', 'Deploy', 'Verify'] }, 0)
+  if (typeof p === 'string') throw new Error(p)
+  expect(p.steps.map(s => s.status)).toEqual(['in_progress', 'pending', 'pending'])
+  p = fromTool(p, { id: 'release', next: true }, 10) as Exclude<typeof p, string>
+  expect(p.steps.map(s => s.status)).toEqual(['completed', 'in_progress', 'pending'])
+  // A changed plan keeps what is done by label.
+  p = fromTool(p, { id: 'release', steps: ['Build', 'Deploy', 'Tests', 'Verify'] }, 20) as Exclude<typeof p, string>
+  expect(p.steps.map(s => s.status)).toEqual(['completed', 'in_progress', 'pending', 'pending'])
+  expect(p.title).toBe('Release pipeline')
+  p = fromTool(p, { id: 'release', done: true }, 30) as Exclude<typeof p, string>
+  expect(planState(p).done).toBe(true)
+  // Sent again after it finished, it starts over.
+  const again = fromTool(p, { id: 'release', steps: ['Build', 'Deploy'] }, 40) as Exclude<typeof p, string>
+  expect(again.steps.map(s => s.status)).toEqual(['in_progress', 'pending'])
+})
+
+test('with planTool on, each progress plan gets a bar of its own', { options: { language: 'de', planTool: true } }, async ($, on) => {
+  mock.clock(on, { now: 1_000_000 })
+  on('command.register', () => ({ value: { command: 'cockpit' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('settings.read', () => ({ value: { model: 'opus' } }))
+  on('session.usage', () => ({
+    value: { startedAt: 0, context: { tokens: 1000, window: 200_000, percent: 1 }, rateLimits: [], cost: { usd: 0 } },
+  }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine</Text>
+  })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  const r = await $.tool.call({ tool: 'mcp__cockpit__progress', id: 'release', title: 'Release pipeline', steps: ['Build', 'Deploy', 'Verify'] })
+  expect('result' in r && r.result).toBe('release: 0/3, active "Build"')
+  await $.tool.call({ tool: 'mcp__cockpit__progress', id: 'docs', title: 'Doku', steps: ['Lesen', 'Schreiben'] })
+
+  for (const surface of ['desktop', 'terminal'] as const) {
+    const band = await $.ui.mount({
+      plugin: 'cockpit',
+      component: 'AbovePrompt',
+      surface,
+      props: { hasSurvey: false, isWorking: true, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} },
+    })
+    expect(await band.find({ type: 'Text', text: /Release pipeline/ })).toBeTruthy()
+    expect(await band.find({ type: 'Text', text: /Doku/ })).toBeTruthy()
+    await band.unmount()
+  }
+})
+
+test('a step counts as hanging after many calls, or a few over a long time', async () => {
+  const p = fromTodos(null, [{ content: 'Build', status: 'in_progress' }, { content: 'Ship', status: 'pending' }], 0)!
+  expect(stuckStep({ ...p, idle: 14 }, 1000)).toBe(null)
+  expect(stuckStep({ ...p, idle: 15 }, 1000)?.title).toBe('Build')
+  expect(stuckStep({ ...p, idle: 3 }, 9 * 60e3)).toBe(null)
+  expect(stuckStep({ ...p, idle: 3 }, 10 * 60e3)?.title).toBe('Build')
+})
+
+test('a list left standing gets one line in the prompt until Claude moves it', async ($, on) => {
+  mock.clock(on, { now: 1_000_000 })
+  on('command.register', () => ({ value: { command: 'cockpit' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('settings.read', () => ({ value: { model: 'opus' } }))
+  on('session.usage', () => ({
+    value: { startedAt: 0, context: { tokens: 1000, window: 200_000, percent: 1 }, rateLimits: [], cost: { usd: 0 } },
+  }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('tool.call', () => ({ result: {} }))
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'hi', scope: 'shared' as const }] }))
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  const todos = [
+    { content: 'Build', status: 'in_progress', activeForm: '' },
+    { content: 'Ship', status: 'pending', activeForm: '' },
+  ]
+  await $.tool.call({ tool: 'TodoWrite', todos })
+  const input = { model: 'claude-opus-5-5', promptModel: 'claude-opus-5-5', surfaces: [], tools: [], outputStyle: null, traits: [] }
+  const stuck = async () => (await $.prompt.compose(input)).sections.some(s => s.id === 'cockpit:stuck')
+  for (let i = 0; i < 15; i++) await $.tool.call({ tool: 'Read', file_path: '/a' })
+  expect(await stuck()).toBe(true)
+  await $.tool.call({ tool: 'TodoWrite', todos: [{ ...todos[0], status: 'completed' }, { ...todos[1], status: 'in_progress' }] })
+  expect(await stuck()).toBe(false)
 })

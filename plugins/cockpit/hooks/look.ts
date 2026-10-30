@@ -88,7 +88,7 @@ export function ringSvg(state: RingState, color: string) {
 
 // The tree, one line per group in its color. The drawings fix each row's height, so the line runs through.
 // leaf is a little taller than a card (about 64 px), so cards keep a gap while the line runs through.
-export const TWIG = { w: 26, x: 9, head: 32, leaf: 74 }
+export const TWIG = { w: 26, x: 9, head: 32, leaf: 74, line: 20 }
 const stroke = (color: string) => `fill="none" stroke="${color}" stroke-opacity=".55" stroke-width="1.5"`
 // The group's head: a dot; open, its line starts under it.
 export const headSvg = (color: string, isOpen: boolean) =>
@@ -123,10 +123,12 @@ export function beadsSvg(items: { state: RingState; color: string }[]) {
               `<circle cx="${x}" cy="${c}" r="2.2" fill="${color}"/>`
   return svg(beadsWidth(items.length), BEAD, items.map((it, i) => one(it.state, it.color, c + i * (BEAD + BEAD_GAP))).join(''))
 }
-// In front of a card: down from the line above, round into the card; the group's last one stops there.
-export function twigSvg(isLast: boolean, color: string) {
-  const { w, x, leaf } = TWIG
-  const mid = leaf / 2
+// A card's twig for its lines of text: a card of two lines takes TWIG.leaf, each line more or less a line's height.
+export const leafHeight = (lines: number) => TWIG.leaf + (lines - 2) * TWIG.line
+// In front of a card: down from the line above, round into the card at its first lines; the group's last one stops there.
+export function twigSvg(isLast: boolean, color: string, leaf: number = TWIG.leaf) {
+  const { w, x } = TWIG
+  const mid = Math.min(leaf, TWIG.leaf) / 2
   return svg(w, leaf, `<path d="M${x} 0V${mid - 8}q0 8 8 8H${w}" ${stroke(color)}/>${isLast ? '' : `<path d="M${x} ${mid}V${leaf}" ${stroke(color)}/>`}`)
 }
 

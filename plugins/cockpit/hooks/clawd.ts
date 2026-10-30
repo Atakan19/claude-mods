@@ -14,7 +14,8 @@ const ROLE_WORDS: [Role, RegExp][] = [
   ['writer', /doc|readme|writ|schreib|text|notes?\b/i],
   ['guide', /guide|claude-code|web-?fetch|research|recherch|frage/i],
   ['explorer', /explore|search|find|such|locat|investig|map\b/i],
-  ['builder', /build|fix|implement|refactor|bau|umsetz|code\b|edit/i],
+  // Last, so general-purpose agents not named for another role still get dressed.
+  ['builder', /build|fix|implement|refactor|bau|umsetz|code\b|edit|deploy|release|pipeline|ship|install|setup|general-purpose/i],
 ]
 export function roleOf(type: string, description: string): Role {
   const text = `${type} ${description}`

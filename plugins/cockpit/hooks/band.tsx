@@ -1,6 +1,6 @@
 import type { EngineInterface, Elements, On } from 'claude-code'
 
-import type { AgentRow, Live, Plan, Running, Turn } from '../types'
+import type { AgentRow, Live, Plan, Running, ToolPlan, Turn } from '../types'
 import { cacheLeft } from './format'
 import {
   barsSvg,
@@ -49,12 +49,14 @@ import {
   visibleAgents,
 } from './progress'
 import { t } from './i18n'
-import { bumpTick, dropDoneCrew, getCrew, getLive, getPlan, getRunning, getTick, getTurns, setPlan } from './state'
+import { lastEnd, planState, stuckStep } from './plan'
+import { bumpTick, dropDoneCrew, getBars, getCrew, getLive, getPlan, getRunning, getTick, getTurns, setBars, setPlan } from './state'
 
 type Ui = Pick<Elements['desktop'], 'Box' | 'Text' | 'Svg' | 'Button'>
 
 const PLAN_BAR = 'plan'
 const AGENTS_BAR = 'agents'
+const TOOL_BAR = 'tool:'
 
 // Which pills the person kept, from /config; fixed per load, as a change of options reloads the module.
 let PILLS = { context: true, limit: true, cache: true, agents: true }
@@ -72,7 +74,10 @@ export function registerBand(on: On, options: BandOptions = {}) {
     const turns = await getTurns($)
     const running = await getRunning($)
     const now = await $.clock.now()
-    const bars = barsOf(await getPlan($), crew, now)
+    const plan = await getPlan($)
+    const bars = [...barsOf(plan, crew, now), ...toolBarsOf(await getBars($), now)]
+    // A finished task list folds away like the strips: draw once more when it is due.
+    if (plan && plan.steps.length > 0 && planState(plan).done) settleBy($, lastEnd(plan) + FOLD_MS + 100, now)
 
     const ui = $.ui.resolve(e)
     const tree = e.surface === 'desktop' && 'Svg' in ui ? desktop($, ui, l, turns, running, crew, bars, now, e.props.bodyColumns) : terminal(ui, l, turns, running, crew, bars, now)
@@ -138,9 +143,11 @@ const isEnded = (a: AgentRow) => a.state === 'done' || a.state === 'error'
 function barsOf(plan: Plan | null, crew: AgentRow[], now: number): Bar[] {
   const agents = crew.map(runOf)
   const agentsDoneAt = crew.length > 0 && crew.every(isEnded) ? Math.max(...crew.map(a => a.endedAt ?? 0)) : null
-  if (plan && plan.steps.length > 0) {
+  // A finished list leaves a few seconds after its last step; a new one brings the bar back.
+  if (plan && plan.steps.length > 0 && !(planState(plan).done && now - lastEnd(plan) > FOLD_MS)) {
     const finished = plan.steps.filter(s => s.status === 'completed').length
-    const state: PlanState = finished === plan.steps.length ? 'done' : 'running'
+    // Yellow while a step looks left hanging (see stuckStep).
+    const state: PlanState = finished === plan.steps.length ? 'done' : stuckStep(plan, now) ? 'needs_input' : 'running'
     return [
       {
         id: PLAN_BAR,
@@ -184,8 +191,32 @@ function barsOf(plan: Plan | null, crew: AgentRow[], now: number): Bar[] {
   ]
 }
 
+// The plans reported with the progress tool, under the task list: each step a stage of its own, so the
+// track has a mark between them and the pill names the stage. A finished one folds away with the strips.
+function toolBarsOf(list: ToolPlan[], now: number): Bar[] {
+  return list
+    .filter(p => !planState(p).done || now - lastEnd(p) <= FOLD_MS)
+    .map(p => {
+      const done = planState(p).done
+      return {
+        id: TOOL_BAR + p.id,
+        title: p.title,
+        kind: 'plan',
+        stages: p.steps.map(s => ({
+          name: s.title,
+          steps: [{ title: '', status: s.status === 'completed' ? 'done' : s.status === 'in_progress' ? 'active' : 'pending', substeps: [], ...(s.endedAt !== undefined ? { doneAt: s.endedAt } : {}) }],
+        })),
+        state: done ? 'done' : 'running',
+        note: null,
+        startedAt: p.startedAt,
+        endedAt: done ? lastEnd(p) : null,
+      }
+    })
+}
+
 async function closeBar($: EngineInterface, id: string) {
   if (id === PLAN_BAR) await setPlan($, () => null)
+  else if (id.startsWith(TOOL_BAR)) await setBars($, list => list.filter(b => b.id !== id.slice(TOOL_BAR.length)))
   else await dropDoneCrew($, Infinity)
 }
 
