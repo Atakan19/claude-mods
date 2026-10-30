@@ -194,8 +194,9 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
     }))
   const background = [...cmds, ...agents]
   if (background.length > 0) {
-    const live = background.filter(l => l.state === 'running' || l.state === 'waiting').length
-    groups.push({ key: 'bg', title: t().background, count: live > 0 ? t().runningCount(live) : t().doneWord, color: C.shell, leaves: background })
+    // Finished of all, as the task list counts: 2/4.
+    const finished = background.filter(l => l.state === 'done' || l.state === 'error').length
+    groups.push({ key: 'bg', title: t().background, count: `${finished}/${background.length}`, color: C.shell, leaves: background })
   }
   if (chats.length > 0) {
     groups.push({

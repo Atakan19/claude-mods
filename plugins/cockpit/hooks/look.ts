@@ -112,7 +112,10 @@ export function beadsSvg(items: { state: RingState; color: string }[]) {
         ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.alert}" stroke-width="2.2"/>`
         : state === 'pending'
           ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.twig}" stroke-width="1.8" stroke-dasharray="2.6 2.6"/>`
-          : state === 'waiting'
+          : state === 'chat'
+            ? // A chat, as its card shows it unfolded: a small speech bubble.
+              `<path d="M${x - 6.5} ${c - 4}a2.5 2.5 0 0 1 2.5-2.5h8a2.5 2.5 0 0 1 2.5 2.5v5a2.5 2.5 0 0 1-2.5 2.5h-4.5l-3.5 2.8v-2.8a2.5 2.5 0 0 1-2.5-2.5z" fill="${color}" fill-opacity=".16" stroke="${color}" stroke-width="1.7" stroke-linejoin="round"/>`
+            : state === 'waiting'
             ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.warn}" stroke-width="2.2"/><circle cx="${x}" cy="${c}" r="2.2" fill="${C.warn}"/>`
             : // Running turns like the big ring: an arc on a pale track.
               `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.track}" stroke-width="2.2"/>` +
