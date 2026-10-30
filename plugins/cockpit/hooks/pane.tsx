@@ -3,7 +3,7 @@ import type { EngineInterface, On } from 'claude-code'
 import type { AgentRow, Env, Limit, Plan, Shell, Subchat } from '../types'
 import { bar, clock, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
-import { C, DIAL, RING, TWIG, coreSvg, dialSvg, repoSvg, ringSvg, toned, trunkSvg, twigSvg, weatherOf } from './look'
+import { C, DIAL, RING, coreSvg, dialSvg, repoSvg, ringSvg, toned, weatherOf } from './look'
 import { elapsed } from './progress'
 import { PANE, getCrew, getEnv, getFolded, getLive, getPlan, getShells, getSubchats, getTally, getTick, toggleFold } from './state'
 
@@ -17,7 +17,7 @@ export async function startPane($: EngineInterface) {
   void $.ui.open({ id: PANE, title: 'Cockpit' })
 }
 
-type Leaf = { key: string; title: string; sub: string; time: string; state: RingState; color: string; isDashed?: boolean }
+type Leaf = { key: string; title: string; sub: string; time: string; state: RingState; color: string }
 type Group = { key: string; title: string; count: string; current?: string; leaves: Leaf[] }
 
 const isRecent = (endedAt: number | null, now: number) => endedAt === null || now - endedAt < KEEP_MS
@@ -91,7 +91,7 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
       key: 'chats',
       title: 'Subchats',
       count: String(chats.length),
-      leaves: chats.map((c, i) => ({ key: `c-${i}`, title: c.title, sub: 'eigener Chat · gestartet', time: `vor ${span(now - c.at)}`, state: 'chat', color: C.chat, isDashed: true })),
+      leaves: chats.map((c, i) => ({ key: `c-${i}`, title: c.title, sub: 'eigener Chat · gestartet', time: `vor ${span(now - c.at)}`, state: 'chat', color: C.chat })),
     })
   }
   return groups
@@ -130,9 +130,6 @@ export function registerPane(on: On) {
       )
       const limitDial = (lim: Limit, label: string, calm: string) =>
         dial(lim.kind, lim.percentUsed, toned(paceOf(lim, now), calm), `${Math.round(lim.percentUsed)}%`, label, resetText(lim, now))
-      // The last leaf drawn ends the trunk; a folded group draws none.
-      const lastKey = groups.flatMap(g => (folded.includes(g.key) ? [] : g.leaves)).at(-1)?.key
-      const LEAF_H = 44
 
       return (
         <Box flexDirection="column" rowGap={1} paddingX={1}>
@@ -163,9 +160,9 @@ export function registerPane(on: On) {
             </Box>
           )}
 
-          <Svg source={`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="1"><rect width="400" height="1" fill="${C.line}"/></svg>`} alt="Trennlinie" width={400} height={1} />
+          <Box height={1} backgroundColor={C.line} />
 
-          <Box flexDirection="column">
+          <Box flexDirection="column" rowGap={1}>
             <Box flexDirection="row" columnGap={1} alignItems="center">
               <Svg source={coreSvg('#ececec')} alt="Diese Session" width={18} height={18} />
               <Text bold>Diese Session</Text>
@@ -179,29 +176,30 @@ export function registerPane(on: On) {
             {groups.map(g => (
               <Box key={g.key} flexDirection="column">
                 <Box flexDirection="row" columnGap={1} alignItems="center">
-                  <Svg source={trunkSvg(20)} alt="Zweig" width={TWIG.w} height={20} />
                   <Button plain dimColor label={`${folded.includes(g.key) ? '▸' : '▾'} ${g.title}`} onPress={() => void toggleFold($, g.key)} />
                   {folded.includes(g.key) && g.current && <Text dimColor>· {g.current}</Text>}
                   <Box flexGrow={1} />
                   <Text dimColor>{g.count}</Text>
                 </Box>
-                {!folded.includes(g.key) && g.leaves.map(leaf => {
-                  const isPale = leaf.state === 'done' || leaf.state === 'pending'
-                  return (
-                    <Box key={leaf.key} flexDirection="row" alignItems="center">
-                      <Svg source={twigSvg(LEAF_H, leaf.key === lastKey, leaf.isDashed === true)} alt="Zweig" width={TWIG.w} height={LEAF_H} />
-                      <Box flexDirection="row" flexGrow={1} columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
-                        <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.sub} width={RING} height={RING} />
-                        <Box flexDirection="column" flexShrink={1}>
-                          {isPale ? <Text dimColor>{leaf.title}</Text> : <Text>{leaf.title}</Text>}
-                          <Text dimColor>{leaf.sub}</Text>
+                {!folded.includes(g.key) && (
+                  // One line down the group's left edge; it stretches with the cards, however tall they get.
+                  <Box flexDirection="row" alignItems="stretch" columnGap={1}>
+                    <Box width={2} marginLeft={1} backgroundColor={C.twig} />
+                    <Box flexDirection="column" flexGrow={1} rowGap={1}>
+                      {g.leaves.map(leaf => (
+                        <Box key={leaf.key} flexDirection="row" columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+                          <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.sub} width={RING} height={RING} />
+                          <Box flexDirection="column" flexShrink={1}>
+                            {leaf.state === 'done' || leaf.state === 'pending' ? <Text dimColor>{leaf.title}</Text> : <Text>{leaf.title}</Text>}
+                            <Text dimColor>{leaf.sub}</Text>
+                          </Box>
+                          <Box flexGrow={1} />
+                          <Text dimColor>{leaf.time}</Text>
                         </Box>
-                        <Box flexGrow={1} />
-                        <Text dimColor>{leaf.time}</Text>
-                      </Box>
+                      ))}
                     </Box>
-                  )
-                })}
+                  </Box>
+                )}
               </Box>
             ))}
           </Box>

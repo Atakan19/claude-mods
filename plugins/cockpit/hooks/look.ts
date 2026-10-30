@@ -65,19 +65,6 @@ export function ringSvg(state: RingState, color: string) {
   return svg(RING, RING, body)
 }
 
-export const TWIG = { w: 26 }
-// The branch in front of a leaf: down from the line above, round into the leaf; the last one stops there.
-export function twigSvg(height: number, isLast: boolean, isDashed: boolean) {
-  const x = 9
-  const mid = Math.round(height / 2)
-  const dash = isDashed ? ' stroke-dasharray="3 3"' : ''
-  const down = isLast ? '' : `<path d="M${x} ${mid}V${height}" fill="none" stroke="${C.twig}" stroke-width="1.5"${dash}/>`
-  return svg(TWIG.w, height, `<path d="M${x} 0V${mid - 8}q0 8 8 8H${TWIG.w}" fill="none" stroke="${C.twig}" stroke-width="1.5"${dash}/>${down}`)
-}
-
-// The trunk past a group's name.
-export const trunkSvg = (height: number) => svg(TWIG.w, height, `<path d="M9 0V${height}" fill="none" stroke="${C.twig}" stroke-width="1.5"/>`)
-
 // The repo card's mark: GitHub's octocat for a GitHub remote, a plain branch fork otherwise.
 export const repoSvg = (isGithub: boolean, color: string) =>
   isGithub
