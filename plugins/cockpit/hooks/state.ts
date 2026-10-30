@@ -4,6 +4,8 @@ import type { EngineInterface } from 'claude-code'
 import type { AgentRow, Env, Goal, Live, Plan, Running, SessionEvent, Shell, Subchat, Touch, Turn } from '../types'
 
 export const PANE = 'cockpit'
+// The history, opened as a dialog from the pane.
+export const HISTORY = 'cockpit-history'
 
 // The scan only follows atoms used in the file that declares them, so every
 // part reads and writes the cockpit's state through these functions.

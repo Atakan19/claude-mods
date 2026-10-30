@@ -106,6 +106,7 @@ const de = {
   read: 'Gelesen',
   // pane: history
   noHistory: 'Der Verlauf beginnt mit dem ersten fertigen Turn.',
+  historyTitle: 'Verlauf',
   turn: 'Turn',
   fromAgent: 'Nachricht von einem Agent',
   fromBackground: 'Meldung aus dem Hintergrund',
@@ -217,6 +218,7 @@ const en: typeof de = {
   changed: 'Changed',
   read: 'Read',
   noHistory: 'The history starts with the first finished turn.',
+  historyTitle: 'History',
   turn: 'Turn',
   fromAgent: 'Message from an agent',
   fromBackground: 'Notice from the background',

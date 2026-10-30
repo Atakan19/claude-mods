@@ -91,10 +91,15 @@ test('band and reply line show one turn', { options: { language: 'de' } }, async
   // Each tab draws, and draws what it holds.
   const props = { title: 'Cockpit', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } as const
   const pane = await $.ui.mount({ plugin: 'cockpit', component: 'Pane', requestId: 'cockpit', surface: 'desktop', props })
-  for (const [tab, want] of [['agents', /Explore code/], ['files', /pane.tsx/], ['history', /^hi$/], ['session', /Diese Session/]] as const) {
+  for (const [tab, want] of [['agents', /Explore code/], ['files', /pane.tsx/], ['session', /Diese Session/]] as const) {
     await pane.press({ key: `tab-${tab}` })
     expect(await pane.find({ type: 'Text', text: want })).toBeTruthy()
   }
+  // The 🕘 opens the history as a dialog of its own.
+  await pane.press({ key: 'open-history' })
+  const history = await $.ui.mount({ plugin: 'cockpit', component: 'Pane', requestId: 'cockpit-history', surface: 'desktop', props })
+  expect(await history.find({ type: 'Text', text: /^hi$/ })).toBeTruthy()
+  await history.unmount()
   // An agent's card folds its details open.
   await pane.press({ key: 'tab-agents' })
   await pane.press({ key: 'agent-a1' })
@@ -142,7 +147,7 @@ test('English, with a tab and a pill switched off', { options: { language: 'en',
   const props = { title: 'Cockpit', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } as const
   const pane = await $.ui.mount({ plugin: 'cockpit', component: 'Pane', requestId: 'cockpit', surface: 'desktop', props })
   expect(await pane.find({ type: 'Text', text: 'This session' })).toBeTruthy()
-  expect(await pane.find({ type: 'Button', key: 'tab-history' })).toBeTruthy()
+  expect(await pane.find({ type: 'Button', key: 'open-history' })).toBeTruthy()
   expect(await pane.find({ type: 'Button', key: 'tab-files' })).toBeFalsy()
   await pane.unmount()
 

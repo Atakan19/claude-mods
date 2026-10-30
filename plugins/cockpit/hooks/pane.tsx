@@ -31,6 +31,7 @@ import {
 import { t } from './i18n'
 import { elapsed } from './progress'
 import {
+  HISTORY,
   PANE,
   getCrew,
   getEnv,
@@ -57,7 +58,7 @@ import {
 // Finished work stays on its branch this long, pale, then leaves the tree.
 const KEEP_MS = 3 * 60e3
 // Session first; the others hold a place until their content is settled.
-const TABS = ['session', 'agents', 'files', 'history'].map(key => ({ key, get label() { return t().tabs[key]! } }))
+const TABS = ['session', 'agents', 'files'].map(key => ({ key, get label() { return t().tabs[key]! } }))
 const GOAL = '#e0a030'
 const roleName = (role: Role) => t().roles[role]!
 const MOOD = {
@@ -441,17 +442,53 @@ function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: Sessio
 }
 
 // What the person switched on in /config; fixed per load, as a change of options reloads the module.
-let SHOW = { rings: true, repo: true, tabs: TABS }
+let SHOW = { rings: true, repo: true, history: true, tabs: TABS }
 type PaneOptions = { paneRings?: unknown; paneRepo?: unknown; tabAgents?: unknown; tabFiles?: unknown; tabHistory?: unknown }
 
+// The history opens as a dialog over the chat: Esc or its ✕ closes it.
+async function openHistory($: EngineInterface) {
+  await $.ui.open({ id: HISTORY, title: t().historyTitle, focus: true, closeOnEscape: true, rows: 24 })
+}
+
 export function registerPane(on: On, options: PaneOptions = {}) {
-  const off = { agents: options.tabAgents === false, files: options.tabFiles === false, history: options.tabHistory === false } as Record<string, boolean>
-  SHOW = { rings: options.paneRings !== false, repo: options.paneRepo !== false, tabs: TABS.filter(tab => !off[tab.key]) }
+  const off = { agents: options.tabAgents === false, files: options.tabFiles === false } as Record<string, boolean>
+  SHOW = { rings: options.paneRings !== false, repo: options.paneRepo !== false, history: options.tabHistory !== false, tabs: TABS.filter(tab => !off[tab.key]) }
 
   on('command.run', { command: 'cockpit' }, async $ => {
     await $.ui.open({ id: PANE, title: paneTitle(await getLive($)) })
 
     return { text: t().opened }
+  })
+
+  // The history dialog: the same timeline the tab had, with a ✕ of its own.
+  on('ui.render', { component: 'Pane', requestId: HISTORY }, async ($, e) => {
+    const turns = await getTurns($)
+    const events = await getEvents($)
+    if (e.surface === 'desktop') {
+      const { Box, Text, Svg, Button } = $.ui.resolve(e)
+      return (
+        <Box flexDirection="column" rowGap={1} paddingX={1}>
+          <Box flexDirection="row">
+            <Text bold>{t().historyTitle}</Text>
+            <Box flexGrow={1} />
+            <Button key="close-history" role="dismiss" plain dimColor label="✕" onPress={() => void $.ui.close({ id: HISTORY })} />
+          </Box>
+          {historyTab({ Box, Text, Svg, Button }, turns, events)}
+        </Box>
+      )
+    }
+    const { Box, Text } = $.ui.resolve(e)
+    return (
+      <Box flexDirection="column">
+        {foldAppTurns(turns)
+          .slice(-15)
+          .map((turn, i) => (
+            <Text key={`${turn.at}-${i}`}>
+              <Text dimColor>{clock(turn.at)}</Text> {promptLine(turn.prompt)} <Text dimColor>· {elapsed(turn.seconds * 1000)} · {t().tools(turn.tools)}</Text>
+            </Text>
+          ))}
+      </Box>
+    )
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
@@ -711,7 +748,6 @@ export function registerPane(on: On, options: PaneOptions = {}) {
 
           {tab === 'agents' && agentsTab($, { Box, Text, Svg, Button }, roster, folded, now)}
           {tab === 'files' && filesTab($, { Box, Text, Svg, Button }, changedFiles, touches, folded, now)}
-          {tab === 'history' && historyTab({ Box, Text, Svg, Button }, turns, events)}
           {tab === 'session' && (
             <Box flexDirection="column" rowGap={1}>
               <Box flexDirection="row" columnGap={1} alignItems="center">
@@ -723,6 +759,7 @@ export function registerPane(on: On, options: PaneOptions = {}) {
                   {tallyLine(tally)}
                   {since !== null && ` · ${elapsed(now - since)}`}
                 </Text>
+                {SHOW.history && <Button key="open-history" plain dimColor label="🕘" onPress={() => void openHistory($)} />}
               </Box>
               {groups.length === 0 && <Text dimColor>{t().nothingAside}</Text>}
               {/* Each group runs on a line of its own: a dot at its name, a twig into each card. */}
