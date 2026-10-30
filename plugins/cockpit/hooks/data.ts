@@ -48,6 +48,13 @@ async function readEnv($: EngineInterface): Promise<Env> {
   }
 }
 
+// Reads the repository and stores it; never throws.
+async function refreshEnv($: EngineInterface) {
+  try {
+    await setEnv($, await readEnv($))
+  } catch {}
+}
+
 // A command Claude sent to the background gets a branch of its own; its description names it.
 async function noteShell($: EngineInterface, description: string | undefined, id: string | undefined) {
   if (!id) return
@@ -110,7 +117,8 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
       })()
     })
     if (pane) await startPane($)
-    await setEnv($, await readEnv($)).catch(() => {})
+    // In the background: a slow repository must not hold up the session's start.
+    void refreshEnv($)
 
     return next(e)
   })
@@ -211,10 +219,10 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
   on('classic.PermissionRequest', async ($, e, next) => {
     const id = e.agent_id
     if (id && (await getCrew($)).some(a => a.id === id)) await upsertCrew($, { id, state: 'waiting', tool: 'Needs approval' })
-    else if (!id) void alert($, 'decision', sounds, toasts)
     const answer = await next(e)
-    // A settings hook answered it: no dialog is in front of the person.
+    // A settings hook answered it (auto mode, an allow rule): no dialog is in front of the person.
     if (id && answer.decision) await upsertCrew($, { id, state: 'running', tool: e.tool_name })
+    else if (!id && !answer.decision) void alert($, 'decision', sounds, toasts)
     return answer
   })
 
@@ -284,8 +292,8 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     }
     await addTurn($, turn)
     await setRunning($, { tools: 0 })
-    // The branch may have moved during the turn.
-    await setEnv($, await readEnv($)).catch(() => {})
+    // The branch may have moved during the turn; read in the background, so the turn ends at once.
+    void refreshEnv($)
 
     return next(e)
   })

@@ -88,7 +88,7 @@ test('band and reply line show one turn', async ($, on) => {
     surface: 'desktop',
     props: { text: 'All done.', isFirstOfReply: false },
   })
-  expect((await reply.find({ type: 'Text', text: /⏱/ }))?.text).toBe('⏱ 14s · 0 Tools · +0 Context · ≈ $0.00 · Cache 90%')
+  expect((await reply.find({ type: 'Text', text: /⏱/ }))?.text).toBe('⏱ 14s · 0 Tools · +0 Context · Cache 90%')
   await reply.unmount()
 
   const other = await $.ui.mount({

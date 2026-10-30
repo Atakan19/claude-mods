@@ -13,8 +13,6 @@ export const k = (n: number) => {
   return `${Math.round(n)}`
 }
 
-export const usd = (n: number) => (n >= 100 ? `$${Math.round(n)}` : `$${n.toFixed(2)}`)
-
 export const bar = (pct: number, width: number) => {
   const full = Math.max(0, Math.min(width, Math.round((pct / 100) * width)))
   return '━'.repeat(full) + '─'.repeat(width - full)

@@ -1,6 +1,6 @@
 import type { On } from 'claude-code'
 
-import { k, usd } from './format'
+import { k } from './format'
 import { getTurns } from './state'
 
 export function registerReply(on: On) {
@@ -17,7 +17,6 @@ export function registerReply(on: On) {
       `⏱ ${t.seconds}s`,
       `${t.tools} Tools`,
       `+${k(t.ctxDelta)} Context`,
-      `≈ ${usd(t.costDelta)}`,
       ...(t.cacheHit > 0 ? [`Cache ${t.cacheHit}%`] : []),
     ]
 
