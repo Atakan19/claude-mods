@@ -3,7 +3,7 @@ import type { EngineInterface, On } from 'claude-code'
 import type { AgentRow, Env, Limit, Live, Plan, Shell, Subchat } from '../types'
 import { bar, clock, elapsedOf, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
-import { BEAD, C, SUP_H, beadsWidth, supSvg, supWidth, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
+import { BEAD, C, SUP_H, TOGGLE_H, toggleSvg, beadsWidth, supSvg, supWidth, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
 import { elapsed } from './progress'
 import { PANE, getRunning, getCrew, getEnv, getFolded, getLive, getPlan, getShells, getSubchats, getTab, getTally, getTick, setTab, toggleFold } from './state'
 
@@ -155,19 +155,21 @@ export function registerPane(on: On) {
         agents: liveAgents > 0 ? { text: String(liveAgents), color: C.agent } : null,
         plan: openSteps > 0 ? { text: String(openSteps), color: C.chat } : null,
       }
-      // A toggle: a rounded track, the open tab a filled pill in it. The surface draws its own pill around a
-      // hovered button's name and cannot be made wider, so the open tab takes that same shape (a secondary button).
+      // A toggle: the track and the open tab's pill are one drawing, the names lie over it.
       const tabs = (
-        <Box flexDirection="row" backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
-          {TABS.map(t => {
-            const badge = badges[t.key] ?? null
-            return (
-              <Box key={t.key} flexGrow={1} width="25%" flexDirection="row" justifyContent="center" alignItems="flex-start">
-                {t.key === tab ? <Button variant="secondary" label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
-                {badge && <Svg source={supSvg(badge.text, badge.color)} alt={badge.text} width={supWidth(badge.text)} height={SUP_H} />}
-              </Box>
-            )
-          })}
+        <Box flexDirection="column">
+          <Svg source={toggleSvg(Math.max(0, TABS.findIndex(t => t.key === tab)), TABS.length)} alt="Tabs" height={TOGGLE_H} />
+          <Box position="absolute" top={0} bottom={0} left={0} right={0} flexDirection="row" alignItems="center">
+            {TABS.map(t => {
+              const badge = badges[t.key] ?? null
+              return (
+                <Box key={t.key} flexGrow={1} width="25%" flexDirection="row" justifyContent="center" alignItems="flex-start">
+                  {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
+                  {badge && <Svg source={supSvg(badge.text, badge.color)} alt={badge.text} width={supWidth(badge.text)} height={SUP_H} />}
+                </Box>
+              )
+            })}
+          </Box>
         </Box>
       )
       const five = l.limits.find(lim => lim.kind === 'five_hour')
