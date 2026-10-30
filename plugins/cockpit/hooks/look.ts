@@ -21,6 +21,8 @@ export const C = {
   card: 'rgba(127,127,127,0.10)',
   segment: 'rgba(127,127,127,0.28)',
   popup: '#2b2b2b',
+  // An invisible border: "transparent" draws white on the desktop.
+  clear: 'rgba(127,127,127,0)',
 } as const
 
 // A calm value keeps its own color; a warning takes amber, an alert red.
@@ -155,9 +157,6 @@ export const weatherSvg = (percent: number, size = 16) => {
   const w = weatherOf(percent)
   return svg(size, size, WEATHER_ICONS[w.icon](w.color), '0 0 24 24')
 }
-
-// The bar under the open tab; the others draw it empty, so every tab keeps one height.
-export const tabBarSvg = (color: string) => svg(28, 3, color === 'none' ? '' : `<rect width="28" height="3" rx="1.5" fill="${color}"/>`)
 
 // A small raised number at a tab's name, as an exponent: what runs or waits there.
 export const SUP_H = 12

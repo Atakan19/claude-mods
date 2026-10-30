@@ -3,7 +3,7 @@ import type { EngineInterface, On } from 'claude-code'
 import type { AgentRow, Env, Limit, Live, Plan, Shell, Subchat } from '../types'
 import { bar, clock, elapsedOf, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
-import { BEAD, C, SUP_H, beadsWidth, supSvg, supWidth, tabBarSvg, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
+import { BEAD, C, SUP_H, beadsWidth, supSvg, supWidth, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
 import { elapsed } from './progress'
 import { PANE, getRunning, getCrew, getEnv, getFolded, getLive, getPlan, getShells, getSubchats, getTab, getTally, getTick, setTab, toggleFold } from './state'
 
@@ -155,27 +155,29 @@ export function registerPane(on: On) {
         agents: liveAgents > 0 ? { text: String(liveAgents), color: C.agent } : null,
         plan: openSteps > 0 ? { text: String(openSteps), color: C.chat } : null,
       }
+      // A toggle: a rounded track, the open tab a lifted pill in it. Every tab draws the same invisible
+      // border, so all keep one height; the button stretches over its whole tab, so a hover lights all of it.
+      // The count sits raised past the name's end, outside its box, so it leaves the name centered.
       const tabs = (
-        <Box flexDirection="column">
-          <Box flexDirection="row">
-            {TABS.map(t => {
-              const badge = badges[t.key] ?? null
-              return (
-                <Box key={t.key} flexGrow={1} width="25%" flexDirection="column" alignItems="center">
-                  <Box flexDirection="row" alignItems="flex-start">
-                    {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
-                    {badge && <Svg source={supSvg(badge.text, badge.color)} alt={badge.text} width={supWidth(badge.text)} height={SUP_H} />}
+        <Box flexDirection="row" backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+          {TABS.map(t => {
+            const badge = badges[t.key] ?? null
+            const isOpen = t.key === tab
+            return (
+              <Box key={t.key} flexGrow={1} width="25%" flexDirection="column" alignItems="stretch" backgroundColor={isOpen ? C.segment : undefined} borderStyle="round" borderColor={isOpen ? C.segment : C.clear}>
+                <Box flexDirection="row" justifyContent="center">
+                  <Box>
+                    {isOpen ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
+                    {badge && (
+                      <Box position="absolute" top={0} right={-(Math.ceil(supWidth(badge.text) / 8) + 1)}>
+                        <Svg source={supSvg(badge.text, badge.color)} alt={badge.text} width={supWidth(badge.text)} height={SUP_H} />
+                      </Box>
+                    )}
                   </Box>
-                  <Svg source={tabBarSvg(t.key === tab ? C.chat : 'none')} alt={t.key === tab ? 'offen' : 'Tab'} width={28} height={3} />
                 </Box>
-              )
-            })}
-          </Box>
-          {/* One thin line under the row, the open tab's bar sits on it. */}
-          <Svg
-            source={`<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1" viewBox="0 0 1000 1" preserveAspectRatio="none"><rect width="1000" height="1" fill="${C.line}"/></svg>`}
-            alt="Linie"
-          />
+              </Box>
+            )
+          })}
         </Box>
       )
       const five = l.limits.find(lim => lim.kind === 'five_hour')
@@ -196,7 +198,7 @@ export function registerPane(on: On) {
       const dial = (d: Dial, side: 'left' | 'middle' | 'right') => (
         <Box key={d.key} flexDirection="column" alignItems="center" width={DIAL.w + 14}>
           {/* Hovered, only a small rounded tile around the ring lights, not the whole third. */}
-          <Box flexDirection="column" alignItems="center" paddingX={1} borderStyle="round" borderColor="transparent" hover={{ backgroundColor: C.card, borderColor: C.card }}>
+          <Box flexDirection="column" alignItems="center" paddingX={1} borderStyle="round" borderColor={C.clear} hover={{ backgroundColor: C.card, borderColor: C.card }}>
             <Svg source={dialSvg(d.percent, d.color, d.value, d.label, d.pace)} alt={`${d.label} ${d.value}`} width={DIAL.w} height={DIAL.h} />
             {d.sub !== '' && <Text dimColor>{d.sub}</Text>}
             {d.warning && <Text color={d.warning.color}>{d.warning.text}</Text>}
