@@ -163,12 +163,6 @@ export const weatherSvg = (percent: number, size = 16) => {
   return svg(size, size, WEATHER_ICONS[w.icon](w.color), '0 0 24 24')
 }
 
-// A small raised number at a tab's name, as an exponent: what runs or waits there.
-export const SUP_H = 12
-export const supWidth = (text: string) => 4 + text.length * 7
-export const supSvg = (text: string, color: string) =>
-  svg(supWidth(text), SUP_H, `<text x="1" y="10" fill="${color}" font-size="11" font-weight="700" font-family="Segoe UI, system-ui, sans-serif">${esc(text)}</text>`)
-
 // The tab toggle, drawn as one picture: a box border costs a whole row, a drawing only its pixels. It
 // stretches over the width (preserveAspectRatio none), so the open tab's pill lands under its quarter.
 export const TOGGLE_H = 36

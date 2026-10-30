@@ -3,7 +3,7 @@ import type { EngineInterface, On } from 'claude-code'
 import type { AgentRow, Env, Limit, Live, Plan, Shell, Subchat } from '../types'
 import { bar, clock, elapsedOf, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
-import { BEAD, C, SUP_H, TOGGLE_H, toggleSvg, beadsWidth, supSvg, supWidth, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
+import { BEAD, C, TOGGLE_H, toggleSvg, beadsWidth, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
 import { elapsed } from './progress'
 import { PANE, getRunning, getCrew, getEnv, getFolded, getLive, getPlan, getShells, getSubchats, getTab, getTally, getTick, setTab, toggleFold } from './state'
 
@@ -149,8 +149,6 @@ export function registerPane(on: On) {
     if (e.surface === 'desktop') {
       const { Box, Text, Svg, Button } = $.ui.resolve(e)
       if (!l) return <Text dimColor>Wartet auf die erste Antwort…</Text>
-      // A segment switch across the width: the open tab lifts out of the track.
-      // Plain tabs over a thin line; the open one is bright with a bar under it, a small raised number says what runs there.
       const badges: Record<string, { text: string; color: string } | null> = {
         agents: liveAgents > 0 ? { text: String(liveAgents), color: C.agent } : null,
         plan: openSteps > 0 ? { text: String(openSteps), color: C.chat } : null,
@@ -175,7 +173,12 @@ export function registerPane(on: On) {
               return (
                 <Box key={t.key} flexGrow={1} width="25%" flexDirection="row" justifyContent="center" alignItems="flex-start">
                   {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
-                  {badge && <Svg source={supSvg(badge.text, badge.color)} alt={badge.text} width={supWidth(badge.text)} height={SUP_H} />}
+                  {/* The count, small and set to the top: raised like an exponent. */}
+                  {badge && (
+                    <Text size="caption" weight="bold" color={badge.color}>
+                      {badge.text}
+                    </Text>
+                  )}
                 </Box>
               )
             })}
@@ -196,29 +199,20 @@ export function registerPane(on: On) {
         warning: { text: string; color: string } | null
         facts: [string, string][]
       }
-      // Hovered, a dial lights and a card with its details opens under it; the surface draws both, no hook runs.
+      // Hovered, a dial's tile lights and a card with its details opens under it; the surface draws both, no hook
+      // runs. Tile and card share a hover scope: the cards are drawn last, so they lie over the tabs' layer.
       const dial = (d: Dial) => (
         <Box key={d.key} flexDirection="column" alignItems="center" width={DIAL.w + 14}>
-          {/* Hovered, only a small rounded tile around the ring lights, not the whole third. */}
-          <Box flexDirection="column" alignItems="center" paddingX={2} borderStyle="round" borderColor={C.clear} hover={{ backgroundColor: C.card, borderColor: C.card }}>
+          <Box flexDirection="column" alignItems="center" paddingX={2} borderStyle="round" borderColor={C.clear} hover={{ scope: `dial-${d.key}`, backgroundColor: C.card, borderColor: C.card }}>
             <Svg source={dialSvg(d.percent, d.color, d.value, d.label, d.pace)} alt={`${d.label} ${d.value}`} width={DIAL.w} height={DIAL.h} />
             {d.sub !== '' && <Text dimColor>{d.sub}</Text>}
             {d.warning && <Text color={d.warning.color}>{d.warning.text}</Text>}
           </Box>
-          <Box
-            position="absolute"
-            // A row under the tile, centered on its dial: it reaches one cell past each side, no further than the pane's padding.
-            top={7}
-            left={-1}
-            right={-1}
-            display="none"
-            hover={{ display: 'flex' }}
-            flexDirection="column"
-            paddingX={1}
-            backgroundColor={C.popup}
-            borderStyle="round"
-            borderColor={C.line}
-          >
+        </Box>
+      )
+      const dialCard = (d: Dial) => (
+        <Box key={d.key} flexDirection="column" width={DIAL.w + 14}>
+          <Box display="none" hover={{ scope: `dial-${d.key}`, display: 'flex' }} flexDirection="column" paddingX={1} backgroundColor={C.popup} borderStyle="round" borderColor={C.line}>
             <Text bold>{d.label}</Text>
             {d.facts.map(([name, fact]) => (
               <Box key={name} flexDirection="row">
@@ -231,10 +225,10 @@ export function registerPane(on: On) {
         </Box>
       )
       const PACE = { calm: 'ruhig', fast: 'zu schnell', alert: 'kritisch' } as const
-      const limitDial = (lim: Limit, label: string, calm: string) => {
+      const limitDial = (lim: Limit, label: string, calm: string): Dial => {
         const gone = elapsedOf(lim, now)
         const at = lim.resetsAt ? Date.parse(lim.resetsAt) : null
-        return dial({
+        return {
           key: lim.kind,
           percent: lim.percentUsed,
           color: toned(paceOf(lim, now), calm),
@@ -249,31 +243,33 @@ export function registerPane(on: On) {
             ['Tempo', PACE[paceOf(lim, now)]],
             ...(at !== null ? [['Reset', `${resetText(lim, now).replace('↻ ', '')} · in ${span(at - now)}`] as [string, string]] : []),
           ],
-        })
+        }
       }
+
+      const dials: Dial[] = [
+        {
+          key: 'ctx',
+          percent: l.ctxPercent,
+          color: l.ctxPercent >= 90 ? C.alert : l.ctxPercent >= 75 ? C.warn : C.context,
+          value: l.ctxTokens > 0 ? k(l.ctxTokens) : '–',
+          label: 'Context',
+          sub: l.ctxTokens > 0 ? `${w.glyph} ${w.word}` : 'misst…',
+          pace: null,
+          warning: ctxWarning(l.ctxPercent),
+          facts: [
+            ['Belegt', `${k(l.ctxTokens)} von ${k(l.ctxWindow)}`],
+            ['Anteil', `${Math.round(l.ctxPercent)} %`],
+            ['Frei', k(Math.max(0, l.ctxWindow - l.ctxTokens))],
+            ['Wetter', `${w.glyph} ${w.word}`],
+          ],
+        },
+        ...(five ? [limitDial(five, '5h', C.five_hour)] : []),
+        ...(seven ? [limitDial(seven, '7d', C.seven_day)] : []),
+      ]
 
       return (
         <Box flexDirection="column" rowGap={1} paddingX={1}>
-          <Box flexDirection="row">
-            {dial({
-              key: 'ctx',
-              percent: l.ctxPercent,
-              color: l.ctxPercent >= 90 ? C.alert : l.ctxPercent >= 75 ? C.warn : C.context,
-              value: l.ctxTokens > 0 ? k(l.ctxTokens) : '–',
-              label: 'Context',
-              sub: l.ctxTokens > 0 ? `${w.glyph} ${w.word}` : 'misst…',
-              pace: null,
-              warning: ctxWarning(l.ctxPercent),
-              facts: [
-                ['Belegt', `${k(l.ctxTokens)} von ${k(l.ctxWindow)}`],
-                ['Anteil', `${Math.round(l.ctxPercent)} %`],
-                ['Frei', k(Math.max(0, l.ctxWindow - l.ctxTokens))],
-                ['Wetter', `${w.glyph} ${w.word}`],
-              ],
-            })}
-            {five && limitDial(five, '5h', C.five_hour)}
-            {seven && limitDial(seven, '7d', C.seven_day)}
-          </Box>
+          <Box flexDirection="row">{dials.map(dial)}</Box>
 
           {env?.repo && (
             <Box flexDirection="row" columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
@@ -345,6 +341,11 @@ export function registerPane(on: On) {
               ))}
             </Box>
           )}
+
+          {/* The dials' cards, drawn last so they lie over every layer above; each column matches its dial's. */}
+          <Box position="absolute" top={7} left={0} right={0} paddingX={1} flexDirection="row">
+            {dials.map(dialCard)}
+          </Box>
         </Box>
       )
     }
