@@ -18,8 +18,6 @@ const TABS = [
   { key: 'verlauf', label: 'Verlauf' },
 ]
 
-const SUPERSCRIPT = '⁰¹²³⁴⁵⁶⁷⁸⁹'
-const superscript = (s: string) => s.replace(/d/g, d => SUPERSCRIPT[Number(d)]!)
 const capital = (s: string) => (s ? `${s[0]!.toUpperCase()}${s.slice(1)}` : s)
 // The pane's title bar carries the model: "Opus 5.5 (Medium)".
 const paneTitle = (l: Live | null) => (l ? `${modelName(l.model)}${l.effort ? ` (${capital(l.effort)})` : ''}` : 'Cockpit')
@@ -169,17 +167,16 @@ export function registerPane(on: On) {
             alt="Tabs"
             height={TOGGLE_H}
           />
-          {/* Pulled up a row over the drawing, in the flow: a positioned layer would be painted over the dials' cards. */}
-          <Box marginTop={-1} flexDirection="row" alignItems="center">
+          <Box position="absolute" top={0} bottom={0} left={0} right={0} flexDirection="row" alignItems="center">
             {TABS.map(t => {
               const badge = badges[t.key] ?? null
               return (
                 <Box key={t.key} flexGrow={1} width="25%" flexDirection="row" justifyContent="center" alignItems="flex-start">
                   {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
-                  {/* The count in superscript digits, raised like an exponent. */}
+                  {/* The count, small and set to the top of the name's row, like an exponent. */}
                   {badge && (
-                    <Text weight="bold" color={badge.color}>
-                      {superscript(badge.text)}
+                    <Text size="caption" weight="bold" color={badge.color}>
+                      {badge.text}
                     </Text>
                   )}
                 </Box>
@@ -214,7 +211,7 @@ export function registerPane(on: On) {
           {/* Under the tile, centered on its dial, one cell past each side. */}
           <Box
             position="absolute"
-            top={7}
+            top={6}
             left={-1}
             right={-1}
             display="none"
@@ -281,31 +278,35 @@ export function registerPane(on: On) {
 
       return (
         <Box flexDirection="column" rowGap={1} paddingX={1}>
-          <Box flexDirection="row">{dials.map(dial)}</Box>
+          {/* Shown top down as rings, repo, tabs, but laid out the other way round: the tabs' names lie on a layer
+              of their own, which would cover anything before it, so the rings and their cards come last. */}
+          <Box flexDirection="column-reverse" rowGap={1}>
+            {tabs}
 
-          {env?.repo && (
-            <Box flexDirection="row" columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
-              <Svg source={repoSvg(env.isGithub, '#ececec')} alt={env.isGithub ? 'GitHub' : 'Git'} width={20} height={20} />
-              <Box flexDirection="column" flexShrink={1}>
-                <Box flexDirection="row" columnGap={1}>
-                  <Text bold>{env.repo.split('/').pop()}</Text>
-                  {env.repo.includes('/') && <Text dimColor>{env.repo.split('/')[0]}</Text>}
-                </Box>
-                {/* Ahead green, behind amber; lines added green, removed red. */}
-                <Box flexDirection="row" columnGap={1} flexWrap="wrap">
-                  {env.branch !== '' && <Text dimColor>⑂ {env.branch}</Text>}
-                  {env.branch !== env.base && env.ahead > 0 && <Text color={C.ok}>↑{env.ahead}</Text>}
-                  {env.branch !== env.base && env.behind > 0 && <Text color={C.warn}>↓{env.behind}</Text>}
-                  {env.branch !== env.base && env.ahead + env.behind > 0 && <Text dimColor>gegen {env.base}</Text>}
-                  {env.changed > 0 && <Text dimColor>● {env.changed} geändert</Text>}
-                  {env.added > 0 && <Text color={C.ok}>+{env.added}</Text>}
-                  {env.removed > 0 && <Text color={C.alert}>−{env.removed}</Text>}
+            {env?.repo && (
+              <Box flexDirection="row" columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+                <Svg source={repoSvg(env.isGithub, '#ececec')} alt={env.isGithub ? 'GitHub' : 'Git'} width={20} height={20} />
+                <Box flexDirection="column" flexShrink={1}>
+                  <Box flexDirection="row" columnGap={1}>
+                    <Text bold>{env.repo.split('/').pop()}</Text>
+                    {env.repo.includes('/') && <Text dimColor>{env.repo.split('/')[0]}</Text>}
+                  </Box>
+                  {/* Ahead green, behind amber; lines added green, removed red. */}
+                  <Box flexDirection="row" columnGap={1} flexWrap="wrap">
+                    {env.branch !== '' && <Text dimColor>⑂ {env.branch}</Text>}
+                    {env.branch !== env.base && env.ahead > 0 && <Text color={C.ok}>↑{env.ahead}</Text>}
+                    {env.branch !== env.base && env.behind > 0 && <Text color={C.warn}>↓{env.behind}</Text>}
+                    {env.branch !== env.base && env.ahead + env.behind > 0 && <Text dimColor>gegen {env.base}</Text>}
+                    {env.changed > 0 && <Text dimColor>● {env.changed} geändert</Text>}
+                    {env.added > 0 && <Text color={C.ok}>+{env.added}</Text>}
+                    {env.removed > 0 && <Text color={C.alert}>−{env.removed}</Text>}
+                  </Box>
                 </Box>
               </Box>
-            </Box>
-          )}
+            )}
 
-          {tabs}
+            <Box flexDirection="row">{dials.map(dial)}</Box>
+          </Box>
 
           {tab !== 'session' && <Text dimColor>Kommt bald.</Text>}
           {tab === 'session' && (

@@ -165,8 +165,7 @@ export const weatherSvg = (percent: number, size = 16) => {
 
 // The tab toggle, drawn as one picture: a box border costs a whole row, a drawing only its pixels. It
 // stretches over the width (preserveAspectRatio none), so the open tab's pill lands under its quarter.
-// One row high (about 26 px on the desktop) plus a margin, so the names pulled up over it sit in its middle.
-export const TOGGLE_H = 30
+export const TOGGLE_H = 36
 export function toggleSvg(open: number, count: number) {
   const W = 1000
   const step = W / count
