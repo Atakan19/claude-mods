@@ -9,10 +9,39 @@ export type Live = {
   model: string
   lastRequestAt: number
   effort?: string
+  // What fills the context, as /context lists it: used rows only, largest first.
+  ctxParts?: { name: string; tokens: number }[]
 }
 
 // Where the session runs: the folder, the repository and its branch, how far it is from the main branch, files changed.
-export type Env = { folder: string; repo: string; branch: string; isGithub: boolean; base: string; ahead: number; behind: number; changed: number; added: number; removed: number }
+export type Env = {
+  folder: string
+  repo: string
+  branch: string
+  isGithub: boolean
+  base: string
+  ahead: number
+  behind: number
+  changed: number
+  added: number
+  removed: number
+  // The last commits, newest first.
+  commits: { hash: string; subject: string; age: string }[]
+  // Commits not yet on the upstream branch; null without one.
+  unpushed: number | null
+  // Files changed against HEAD, paths from the repository's root.
+  files: GitFile[]
+}
+export type GitFile = { path: string; status: 'M' | 'A' | 'D' | 'R' | '?'; added: number; removed: number }
+
+// A file this session read or changed, from the tools' arguments only.
+export type Touch = { path: string; kind: 'read' | 'edit'; count: number; at: number }
+
+// Something that happened between turns: a compaction or a change of model.
+export type SessionEvent = { at: number; kind: 'compact' | 'model'; note: string }
+
+// A goal set with /goal or proposed by Claude; the engine does not say when one is reached.
+export type Goal = { condition: string; at: number; by: 'you' | 'claude'; endedAt: number | null }
 
 // The whole session, past the 50 turns kept.
 export type Tally = { turns: number; tools: number; since: number | null }
@@ -25,6 +54,8 @@ export type Subchat = { title: string; at: number }
 
 export type Turn = {
   at: number
+  // The prompt's opening, for the history.
+  prompt?: string
   answer: string
   seconds: number
   tools: number
@@ -68,6 +99,11 @@ declare module 'claude-code' {
       tab: string
       shells: Shell[]
       subchats: Subchat[]
+      roster: AgentRow[]
+      touches: Touch[]
+      events: SessionEvent[]
+      goals: Goal[]
+      repoOpen: boolean
     }
   }
 }

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { AgentRow, Env, Live, Plan, Running, Shell, Subchat, Turn } from '../types'
+import type { AgentRow, Env, Goal, Live, Plan, Running, SessionEvent, Shell, Subchat, Touch, Turn } from '../types'
 
 export const PANE = 'cockpit'
 
@@ -17,7 +17,7 @@ const plan = atom({ plugin: 'cockpit', key: 'plan' } as const, null, { shape: 'p
 // Bumped every 30 s so countdowns redraw without a turn.
 const tick = atom({ plugin: 'cockpit', key: 'tick' } as const, 0)
 // Tagged: an env stored before the repo card lacks its fields and reads as none.
-const env = atom({ plugin: 'cockpit', key: 'env' } as const, null, { shape: 'env-3' })
+const env = atom({ plugin: 'cockpit', key: 'env' } as const, null, { shape: 'env-4' })
 const tally = atom({ plugin: 'cockpit', key: 'tally' } as const, { turns: 0, tools: 0, since: null })
 // The pane groups the user folded shut.
 const folded = atom({ plugin: 'cockpit', key: 'folded' } as const, [])
@@ -25,6 +25,49 @@ const folded = atom({ plugin: 'cockpit', key: 'folded' } as const, [])
 const tab = atom({ plugin: 'cockpit', key: 'tab' } as const, 'session')
 const shells = atom({ plugin: 'cockpit', key: 'shells' } as const, [])
 const subchats = atom({ plugin: 'cockpit', key: 'subchats' } as const, [])
+// Every agent of the session for the Agents tab; the band's crew forgets finished batches.
+const roster = atom({ plugin: 'cockpit', key: 'roster' } as const, [])
+const touches = atom({ plugin: 'cockpit', key: 'touches' } as const, [])
+const events = atom({ plugin: 'cockpit', key: 'events' } as const, [])
+const goals = atom({ plugin: 'cockpit', key: 'goals' } as const, [])
+// Whether the repo card's details are folded open.
+const repoOpen = atom({ plugin: 'cockpit', key: 'repoOpen' } as const, false)
+
+export async function getRoster($: EngineInterface) {
+  return read($, roster)
+}
+export async function getTouches($: EngineInterface) {
+  return read($, touches)
+}
+// One row per path and kind, counted; the newest 100.
+export async function addTouch($: EngineInterface, path: string, kind: Touch['kind'], at: number) {
+  await update($, touches, list => {
+    const old = list.find(t => t.path === path && t.kind === kind)
+    const rest = list.filter(t => t !== old)
+    return [...rest, { path, kind, count: (old?.count ?? 0) + 1, at }].slice(-100)
+  })
+}
+export async function getEvents($: EngineInterface) {
+  return read($, events)
+}
+export async function addEvent($: EngineInterface, event: SessionEvent) {
+  await update($, events, list => [...list, event].slice(-20))
+}
+export async function getGoals($: EngineInterface) {
+  return read($, goals)
+}
+export async function addGoal($: EngineInterface, goal: Goal) {
+  await update($, goals, list => [...list, goal].slice(-10))
+}
+export async function endGoals($: EngineInterface, now: number) {
+  await update($, goals, list => list.map(g => (g.endedAt === null ? { ...g, endedAt: now } : g)))
+}
+export async function getRepoOpen($: EngineInterface) {
+  return read($, repoOpen)
+}
+export async function toggleRepoOpen($: EngineInterface) {
+  await update($, repoOpen, open => !open)
+}
 
 export async function getEnv($: EngineInterface) {
   return read($, env)
@@ -97,11 +140,13 @@ export async function getCrew($: EngineInterface) {
 }
 // Adds the agent, or patches it in place; its start time stays the first one.
 export async function upsertCrew($: EngineInterface, row: Partial<AgentRow> & { id: string }) {
-  await update($, crew, list => {
+  const merge = (list: AgentRow[]) => {
     const old = list.find(a => a.id === row.id)
     if (!old) return [...list, { description: 'Agent', type: '', state: 'running' as const, tool: '', startedAt: 0, endedAt: null, ...row }]
     return list.map(a => (a.id === row.id ? { ...a, ...row, startedAt: a.startedAt } : a))
-  })
+  }
+  await update($, crew, merge)
+  await update($, roster, list => merge(list).slice(-30))
 }
 // Drops the finished rows that ended before the given time.
 export async function dropDoneCrew($: EngineInterface, before: number) {

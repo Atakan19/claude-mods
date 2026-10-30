@@ -1,7 +1,8 @@
 cockpit
 Copyright 2026 Atakan19
 
-This mod reuses code and looks from three mods:
+This mod reuses code and looks from three mods (and hooks/clawd.ts redraws Clawd,
+Claude Code's pixel mascot by Anthropic PBC, as the Agents tab's figures):
 
 1. token-weather-usage by Eric Cologni (https://github.com/augiefra/claude-mods),
    Copyright 2026 Eric Cologni, licensed under the Apache License, Version 2.0

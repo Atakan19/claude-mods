@@ -14,6 +14,8 @@ test('band and reply line show one turn', async ($, on) => {
   on('session.usage', () => ({ value: USAGE }))
   on('settings.read', () => ({ value: { model: 'opus' } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.cwd', () => ({ value: '/work' }))
+  on('session.repo', () => ({ value: null }))
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('turn.complete', () => ({ text: '' }))
   on('agent.spawn', () => ({ agentId: 'a1', model: 'claude-haiku-4-5' }))
@@ -42,6 +44,10 @@ test('band and reply line show one turn', async ($, on) => {
   // A command left running and a chat started from here hang off the session in the pane.
   await $.tool.call({ tool: 'Bash', command: 'npm run dev', description: 'Start dev server', run_in_background: true })
   await $.tool.call({ tool: 'mcp__ccd_session__start_session', title: 'Pane tabs' } as never)
+  // Files the tools touched, and a goal Claude proposed.
+  await $.tool.call({ tool: 'Edit', file_path: '/work/hooks/pane.tsx', old_string: 'a', new_string: 'b' } as never)
+  await $.tool.call({ tool: 'Read', file_path: '/work/hooks/data.ts' } as never)
+  await $.tool.call({ tool: 'ProposeGoal', condition: 'All tests pass' } as never)
 
   // Desktop: the pills, then the agents' bar with one strip.
   const band = await $.ui.mount({
@@ -78,9 +84,18 @@ test('band and reply line show one turn', async ($, on) => {
       props: { title: 'Cockpit', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
     })
     if (surface === 'terminal') expect(await pane.find({ type: 'Text', text: 'Opus 5.5' })).toBeTruthy()
-    for (const leaf of ['Start dev server', 'Pane tabs', 'Explore code', 'Turns']) expect(await pane.find({ type: 'Text', text: new RegExp(leaf) })).toBeTruthy()
+    for (const leaf of ['Start dev server', 'Pane tabs', 'Explore code', 'Turns', 'All tests pass']) expect(await pane.find({ type: 'Text', text: new RegExp(leaf) })).toBeTruthy()
     await pane.unmount()
   }
+
+  // Each tab draws, and draws what it holds.
+  const props = { title: 'Cockpit', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } as const
+  const pane = await $.ui.mount({ plugin: 'cockpit', component: 'Pane', requestId: 'cockpit', surface: 'desktop', props })
+  for (const [tab, want] of [['agents', /Explore code/], ['files', /pane.tsx/], ['history', /^hi$/], ['session', /Diese Session/]] as const) {
+    await pane.press({ key: `tab-${tab}` })
+    expect(await pane.find({ type: 'Text', text: want })).toBeTruthy()
+  }
+  await pane.unmount()
 
   const reply = await $.ui.mount({
     plugin: 'cockpit',

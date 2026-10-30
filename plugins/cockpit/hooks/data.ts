@@ -1,13 +1,13 @@
 import type { EngineInterface, On, SessionUsage } from 'claude-code'
 
-import type { Env, Live, Turn } from '../types'
-import { cacheLeft, cacheTtlMs, k, span } from './format'
+import type { Env, GitFile, Live, Turn } from '../types'
+import { cacheLeft, cacheTtlMs, k, modelName, span } from './format'
 import { retitlePane, startPane } from './pane'
 import { clearDonePlan } from './plan'
 import { FOLD_MS } from './progress'
 import { notify } from './notify'
 import { play } from './sound'
-import { addShell, addSubchat, addTurn, bumpTick, countAgent, dropDoneCrew, endShells, getCrew, getEnv, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
+import { addEvent, addGoal, addShell, addSubchat, addTouch, addTurn, endGoals, bumpTick, countAgent, dropDoneCrew, endShells, getCrew, getEnv, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
 
 type Reading = Pick<SessionUsage, 'context' | 'rateLimits' | 'cost'>
 
@@ -15,17 +15,36 @@ const ALERT = { done: 'Claude ist fertig', decision: 'Claude wartet auf dich', e
 
 const base = (path: string) => path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() ?? path
 
-// One git call; empty when it fails.
+// One git call; empty when it fails. Only the end is trimmed: porcelain lines start with a space.
 async function git($: EngineInterface, cwd: string, args: string[]) {
   const r = await $.process.run(['git', '-C', cwd, ...args], { timeoutMs: 3000 }).catch(() => null)
-  return r?.exitCode === 0 ? r.stdout.trim() : ''
+  return r?.exitCode === 0 ? r.stdout.trimEnd() : ''
+}
+
+// The changed files: status letters from porcelain, line counts from numstat.
+function filesOf(status: string, numstat: string): GitFile[] {
+  const counts = new Map<string, [number, number]>()
+  for (const line of numstat.split('\n')) {
+    const [a, d, p] = line.split('\t')
+    if (p) counts.set(p.replace(/^.* => /, ''), [Number(a) || 0, Number(d) || 0])
+  }
+  return status
+    .split('\n')
+    .filter(Boolean)
+    .map(line => {
+      const code = line.slice(0, 2)
+      const path = line.slice(3).replace(/^.* -> /, '').replace(/^"|"$/g, '')
+      const [added, removed] = counts.get(path) ?? [0, 0]
+      const kind: GitFile['status'] = code === '??' ? '?' : code.includes('A') ? 'A' : code.includes('D') ? 'D' : code.includes('R') ? 'R' : 'M'
+      return { path, status: kind, added, removed }
+    })
 }
 
 // The folder, the repository as owner/name, the branch git is on, how far it is from the main branch and the files changed.
 async function readEnv($: EngineInterface): Promise<Env> {
   const cwd = await $.session.cwd()
   const repo = await $.session.repo().catch(() => null)
-  const none = { folder: base(cwd), repo: '', branch: '', isGithub: false, base: '', ahead: 0, behind: 0, changed: 0, added: 0, removed: 0 }
+  const none = { folder: base(cwd), repo: '', branch: '', isGithub: false, base: '', ahead: 0, behind: 0, changed: 0, added: 0, removed: 0, commits: [], unpushed: null, files: [] }
   if (!repo) return none
   // The remote's main branch if it names one, else the first of origin/main, main, master that exists.
   let main = await git($, cwd, ['rev-parse', '--abbrev-ref', 'origin/HEAD'])
@@ -34,6 +53,10 @@ async function readEnv($: EngineInterface): Promise<Env> {
   const status = await git($, cwd, ['status', '--porcelain'])
   // "3 files changed, 120 insertions(+), 40 deletions(-)"
   const stat = await git($, cwd, ['diff', '--shortstat', 'HEAD'])
+  const numstat = await git($, cwd, ['diff', '--numstat', 'HEAD'])
+  // hash, subject and age, split by tabs
+  const log = await git($, cwd, ['log', '-3', '--format=%h%x09%s%x09%cr'])
+  const unpushed = await git($, cwd, ['rev-list', '--count', '@{u}..HEAD'])
   return {
     ...none,
     repo: repo.remote?.match(/([^/:]+\/[^/]+?)(\.git)?$/)?.[1] ?? base(repo.root),
@@ -45,7 +68,28 @@ async function readEnv($: EngineInterface): Promise<Env> {
     changed: status ? status.split('\n').length : 0,
     added: Number(/(\d+) insertion/.exec(stat)?.[1] ?? 0),
     removed: Number(/(\d+) deletion/.exec(stat)?.[1] ?? 0),
+    commits: log
+      .split('\n')
+      .filter(Boolean)
+      .map(line => {
+        const [hash = '', subject = '', age = ''] = line.split('\t')
+        return { hash, subject, age }
+      }),
+    unpushed: unpushed === '' ? null : Number(unpushed),
+    files: filesOf(status, numstat),
   }
+}
+
+// A file a tool read or changed, by its path only: the Dateien tab lists them.
+const TOUCH: Record<string, 'read' | 'edit'> = { Read: 'read', Edit: 'edit', Write: 'edit', NotebookEdit: 'edit' }
+async function noteTouch($: EngineInterface, tool: string, args: { file_path?: unknown; notebook_path?: unknown }) {
+  const kind = TOUCH[tool]
+  const file = args.file_path ?? args.notebook_path
+  if (!kind || typeof file !== 'string') return
+  const cwd = (await $.session.cwd()).replace(/\\/g, '/').replace(/\/$/, '')
+  const p = file.replace(/\\/g, '/')
+  const rel = p.toLowerCase().startsWith(`${cwd.toLowerCase()}/`) ? p.slice(cwd.length + 1) : p
+  await addTouch($, rel, kind, await $.clock.now())
 }
 
 // Reads the repository and stores it; never throws.
@@ -71,6 +115,13 @@ async function alert($: EngineInterface, kind: keyof typeof ALERT, sounds: boole
   notify($, ALERT[kind], env?.repo ? `${env.repo.split('/').pop()} · ${env.branch || env.folder}` : env?.folder || 'Claude Code')
 }
 
+// What fills the context, counted locally ('summary': no request is made).
+async function ctxPartsOf($: EngineInterface): Promise<Partial<Live>> {
+  const u = await $.session.usage({ breakdown: 'summary' }).catch(() => null)
+  const rows = u?.context.breakdown?.categories.filter(c => c.kind === 'used' && c.tokens > 0) ?? []
+  return rows.length > 0 ? { ctxParts: rows.sort((a, b) => b.tokens - a.tokens).map(c => ({ name: c.name, tokens: c.tokens })) } : {}
+}
+
 async function apply($: EngineInterface, u: Reading, toasts: boolean, extra: Partial<Live> = {}) {
   const prev = await getLive($)
   const limits = u.rateLimits.map(l => ({ kind: l.kind, percentUsed: l.percentUsed, resetsAt: l.resetsAt }))
@@ -93,7 +144,7 @@ async function apply($: EngineInterface, u: Reading, toasts: boolean, extra: Par
 
 // The one source every part draws from: usage, turns, running tools and agents.
 export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boolean) {
-  let turnStart = { ctx: 0, cost: 0, tools: 0 }
+  let turnStart = { ctx: 0, cost: 0, tools: 0, prompt: '' }
   let cacheWarned = false
 
   on('session.start', async ($, e, next) => {
@@ -167,6 +218,39 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     return next(e)
   })
 
+  // A compaction: noted with the size it started from.
+  on('session.compact', async ($, e, next) => {
+    const before = (await getLive($))?.ctxTokens ?? 0
+    const r = await next(e)
+    try {
+      if (e.agentId === undefined && !('skip' in r)) {
+        await addEvent($, { at: await $.clock.now(), kind: 'compact', note: `${e.trigger === 'manual' ? '/compact' : 'automatisch'} bei ${k(before)}` })
+      }
+    } catch {}
+    return r
+  })
+
+  // Goals: the person's /goal (clear ends them) and the ones Claude proposed that were set.
+  on('command.run', { command: 'goal' }, async ($, e, next) => {
+    const r = await next(e)
+    try {
+      const text = e.args.trim()
+      const now = await $.clock.now()
+      if (/^(clear|stop|off|reset)$/i.test(text)) await endGoals($, now)
+      else if (text !== '') await addGoal($, { condition: text.slice(0, 200), at: now, by: 'you', endedAt: null })
+    } catch {}
+    return r
+  })
+  on('tool.call', { tool: 'ProposeGoal' }, async ($, e, next) => {
+    const r = await next(e)
+    try {
+      if (e.agentId === undefined && !('deny' in r) && !r.isError && typeof e.condition === 'string') {
+        await addGoal($, { condition: e.condition.slice(0, 200), at: await $.clock.now(), by: 'claude', endedAt: null })
+      }
+    } catch {}
+    return r
+  })
+
   on('session.measure', async ($, e, next) => {
     await apply($, e, toasts)
 
@@ -206,6 +290,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
       const prev = await getLive($)
       const effort = e.effort !== undefined ? String(e.effort) : prev?.effort
       if (prev && (prev.model !== e.model || prev.effort !== effort)) {
+        if (prev.model && prev.model !== e.model) await addEvent($, { at: await $.clock.now(), kind: 'model', note: `${modelName(prev.model)} → ${modelName(e.model)}` })
         await setLive($, p => ({ ...(p ?? prev), model: e.model, ...(effort !== undefined ? { effort } : {}) }))
         await retitlePane($).catch(() => {})
       }
@@ -229,7 +314,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
   on('turn.start', async ($, e, next) => {
     if (e.agentId !== undefined) return next(e)
     const l = await getLive($)
-    turnStart = { ctx: l?.ctxTokens ?? 0, cost: l?.costUsd ?? 0, tools: 0 }
+    turnStart = { ctx: l?.ctxTokens ?? 0, cost: l?.costUsd ?? 0, tools: 0, prompt: e.text.split('\n')[0]!.trim().slice(0, 80) }
     await setRunning($, { tools: 0 })
     if (e.text !== '') await clearDonePlan($)
 
@@ -250,6 +335,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     // Past a permission dialog the tool ran: the strip is no longer waiting. Caught here, so
     // the .catch below never runs the tool a second time.
     try {
+      if (!('deny' in r) && !r.isError) await noteTouch($, e.tool, e as { file_path?: unknown; notebook_path?: unknown })
       if (isCrew && (await getCrew($)).find(a => a.id === agentId)?.state === 'waiting') {
         await upsertCrew($, { id: agentId, state: 'running', tool: e.tool })
       }
@@ -274,6 +360,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     }
     if (!e.isAborted) void alert($, e.reason === 'answer' ? 'done' : 'error', sounds, toasts)
     await apply($, await $.session.usage(), toasts, {
+      ...(await ctxPartsOf($)),
       lastRequestAt: await $.clock.now(),
       ...(e.usage ? { model: e.usage.model } : {}),
     })
@@ -283,6 +370,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     const prompt = u ? u.input_tokens + u.cache_read_input_tokens + u.cache_creation_input_tokens : 0
     const turn: Turn = {
       at: await $.clock.now(),
+      ...(turnStart.prompt ? { prompt: turnStart.prompt } : {}),
       answer: e.answer.trim(),
       seconds: Math.round(e.durationMs / 1000),
       tools: turnStart.tools,

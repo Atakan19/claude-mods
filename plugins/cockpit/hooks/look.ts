@@ -176,3 +176,29 @@ export function toggleSvg(open: number, count: number) {
     `</svg>`
   )
 }
+
+// The history's line: a dot per turn (filled) or event (hollow, amber); the line runs on unless it is the last row.
+export const STEP = { w: 22, h: 46 }
+export function stepSvg(kind: 'turn' | 'event', isLast: boolean) {
+  const x = 9
+  const y = 14
+  const line = `<path d="M${x} 0V${isLast ? y : STEP.h}" ${stroke('#8a8a8a')}/>`
+  const dot = kind === 'turn' ? `<circle cx="${x}" cy="${y}" r="4.5" fill="#6a6a6a"/>` : `<circle cx="${x}" cy="${y}" r="4.5" fill="#1f1f1f" stroke="${C.warn}" stroke-width="1.6"/>`
+  return svg(STEP.w, STEP.h, line + dot)
+}
+
+// The context's parts as one bar, stretched over the card's width.
+export const PART_COLORS = [C.context, C.shell, C.chat, C.agent, '#8a8a8a', C.five_hour]
+export function partsSvg(parts: { tokens: number }[]) {
+  const total = parts.reduce((n, p) => n + p.tokens, 0) || 1
+  let x = 0
+  const rects = parts
+    .map((p, i) => {
+      const w = (1000 * p.tokens) / total
+      const r = `<rect x="${x.toFixed(1)}" width="${w.toFixed(1)}" height="8" fill="${PART_COLORS[i % PART_COLORS.length]}"/>`
+      x += w
+      return r
+    })
+    .join('')
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="8" viewBox="0 0 1000 8" preserveAspectRatio="none">${rects}</svg>`
+}

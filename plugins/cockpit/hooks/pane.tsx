@@ -1,11 +1,57 @@
-import type { EngineInterface, On } from 'claude-code'
+import type { Elements, EngineInterface, On } from 'claude-code'
 
-import type { AgentRow, Env, Limit, Live, Plan, Shell, Subchat } from '../types'
+import type { AgentRow, Env, GitFile, Goal, Limit, Live, Plan, SessionEvent, Shell, Subchat, Touch, Turn } from '../types'
 import { bar, clock, elapsedOf, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
-import { BEAD, C, TOGGLE_H, toggleSvg, beadsWidth, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
+import type { Role } from './clawd'
+import { CLAWD, clawdSvg, roleOf } from './clawd'
+import {
+  BEAD,
+  C,
+  PART_COLORS,
+  STEP,
+  TOGGLE_H,
+  toggleSvg,
+  beadsWidth,
+  DIAL,
+  RING,
+  TWIG,
+  beadsSvg,
+  coreSvg,
+  dialSvg,
+  headSvg,
+  partsSvg,
+  repoSvg,
+  ringSvg,
+  stepSvg,
+  toned,
+  twigSvg,
+  weatherOf,
+} from './look'
 import { elapsed } from './progress'
-import { PANE, getRunning, getCrew, getEnv, getFolded, getLive, getPlan, getShells, getSubchats, getTab, getTally, getTick, setTab, toggleFold } from './state'
+import {
+  PANE,
+  getCrew,
+  getEnv,
+  getEvents,
+  getFolded,
+  getGoals,
+  getLive,
+  getPlan,
+  getRepoOpen,
+  getRoster,
+  getRunning,
+  getShells,
+  getSubchats,
+  getTab,
+  getTally,
+  getTick,
+  getTouches,
+  getTurns,
+  setTab,
+  toggleFold,
+  toggleRepoOpen,
+} from './state'
 
 // Finished work stays on its branch this long, pale, then leaves the tree.
 const KEEP_MS = 3 * 60e3
@@ -14,9 +60,13 @@ const DAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
 const TABS = [
   { key: 'session', label: 'Session' },
   { key: 'agents', label: 'Agents' },
-  { key: 'plan', label: 'Plan' },
-  { key: 'verlauf', label: 'Verlauf' },
+  { key: 'files', label: 'Dateien' },
+  { key: 'history', label: 'Verlauf' },
 ]
+const GOAL = '#e0a030'
+const ROLE_NAME: Record<Role, string> = { explorer: 'Explore', designer: 'Designer', tester: 'Tester', reviewer: 'Reviewer', builder: 'Builder', writer: 'Schreiber', guide: 'Guide', plain: 'Agent' }
+const MOOD = { running: ['läuft', C.agent], waiting: ['wartet auf dich', C.warn], done: ['fertig', C.ok], error: ['Fehler', C.alert] } as const
+const FILE_COLOR: Record<GitFile['status'], string> = { M: C.warn, A: C.ok, D: C.alert, R: C.shell, '?': C.ok }
 
 const capital = (s: string) => (s ? `${s[0]!.toUpperCase()}${s.slice(1)}` : s)
 // The pane's title bar carries the model: "Opus 5.5 (Medium)".
@@ -64,8 +114,26 @@ function repoLine(env: Env) {
 const tallyLine = (t: { turns: number; tools: number }) => `${t.turns} ${t.turns === 1 ? 'Turn' : 'Turns'} · ${t.tools} ${t.tools === 1 ? 'Tool' : 'Tools'}`
 
 // What hangs off the session: the task list, the background work, the chats it started.
-function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: Subchat[], now: number): Group[] {
+function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: Subchat[], goals: Goal[], now: number): Group[] {
   const groups: Group[] = []
+  // Only goals set out loud (/goal, or Claude's proposal once set); the engine never says one is reached.
+  if (goals.length > 0) {
+    const active = goals.filter(g => g.endedAt === null).length
+    groups.push({
+      key: 'goals',
+      title: 'Ziele',
+      count: active > 0 ? `${active} aktiv` : 'beendet',
+      color: GOAL,
+      leaves: goals.map((g, i) => ({
+        key: `g-${i}`,
+        title: g.condition,
+        sub: g.endedAt === null ? `${g.by === 'you' ? 'von dir' : 'von Claude'} · seit ${span(now - g.at)}` : 'beendet',
+        time: '',
+        state: g.endedAt === null ? 'running' : 'done',
+        color: GOAL,
+      })),
+    })
+  }
   if (plan && plan.steps.length > 0) {
     const done = plan.steps.filter(s => s.status === 'completed').length
     groups.push({
@@ -121,6 +189,153 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
   return groups
 }
 
+type DesktopUi = Pick<Elements['desktop'], 'Box' | 'Text' | 'Svg' | 'Button'>
+
+// The changed files: from git when the session is in a repository, else the files the tools edited.
+type FileRow = GitFile & { at: number | null }
+function filesOf(env: Env | null, touches: Touch[]): FileRow[] {
+  const edited = new Map(touches.filter(t => t.kind === 'edit').map(t => [t.path, t.at]))
+  if (env?.repo) return env.files.map(f => ({ ...f, at: edited.get(f.path) ?? [...edited].find(([p]) => p.endsWith(f.path) || f.path.endsWith(p))?.[1] ?? null }))
+  return touches.filter(t => t.kind === 'edit').map(t => ({ path: t.path, status: 'M' as const, added: 0, removed: 0, at: t.at }))
+}
+const dirOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
+const nameOf = (p: string) => p.slice(p.lastIndexOf('/') + 1)
+
+// Agents: running and waiting first, then the newest; Clawd dressed for the role, the state in the figure.
+function agentsTab({ Box, Text, Svg }: DesktopUi, roster: AgentRow[], now: number) {
+  if (roster.length === 0) return <Text dimColor>Noch keine Agents in dieser Session.</Text>
+  const live = (a: AgentRow) => a.state === 'running' || a.state === 'waiting'
+  const list = [...roster].sort((a, b) => Number(live(b)) - Number(live(a)) || b.startedAt - a.startedAt)
+  return (
+    <Box flexDirection="column" rowGap={1}>
+      {list.map(a => {
+        const role = roleOf(a.type, a.description)
+        const [word, color] = MOOD[a.state]
+        return (
+          <Box key={a.id} flexDirection="row" columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+            <Svg source={clawdSvg(role, a.state)} alt={`${ROLE_NAME[role]}, ${word}`} width={CLAWD.w * 0.7} height={CLAWD.h * 0.7} />
+            <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+              <Box flexDirection="row" columnGap={1}>
+                <Text bold wrap="truncate-end">
+                  {a.description}
+                </Text>
+                <Box flexGrow={1} />
+                <Text color={color}>● {word}</Text>
+              </Box>
+              <Text dimColor wrap="truncate-end">
+                {[role === 'plain' ? a.type : ROLE_NAME[role], a.model && modelName(a.model), elapsed((a.endedAt ?? now) - a.startedAt)].filter(Boolean).join(' · ')}
+              </Text>
+              <Text color={a.state === 'waiting' ? C.warn : a.state === 'error' ? C.alert : undefined} dimColor={a.state === 'done'} wrap="truncate-end">
+                {a.state === 'done' ? 'fertig' : a.tool}
+              </Text>
+            </Box>
+          </Box>
+        )
+      })}
+    </Box>
+  )
+}
+
+// Dateien: what changed, by folder, and what was only read, folded until asked.
+function filesTab($: EngineInterface, { Box, Text, Button }: DesktopUi, changed: FileRow[], touches: Touch[], folded: string[], now: number) {
+  const reads = touches.filter(t => t.kind === 'read' && !changed.some(c => c.path === t.path || t.path.endsWith(c.path))).sort((a, b) => b.at - a.at)
+  const dirs = [...new Set(changed.map(c => dirOf(c.path)))].sort()
+  const isReadOpen = folded.includes('files-read-open')
+  const added = changed.reduce((n, c) => n + c.added, 0)
+  const removed = changed.reduce((n, c) => n + c.removed, 0)
+  if (changed.length === 0 && reads.length === 0) return <Text dimColor>Diese Session hat noch keine Datei angefasst.</Text>
+  return (
+    <Box flexDirection="column">
+      <Box flexDirection="row" columnGap={1}>
+        <Text dimColor>Geändert</Text>
+        <Box flexGrow={1} />
+        {added > 0 && <Text color={C.ok}>+{added}</Text>}
+        {removed > 0 && <Text color={C.alert}>−{removed}</Text>}
+        {changed.length === 0 && <Text dimColor>nichts</Text>}
+      </Box>
+      {dirs.map(dir => (
+        <Box key={dir || '.'} flexDirection="column" marginTop={1}>
+          <Text dimColor>{dir === '' ? 'Wurzel' : `${dir}/`}</Text>
+          {changed
+            .filter(c => dirOf(c.path) === dir)
+            .map(c => (
+              <Box key={c.path} flexDirection="row" columnGap={1} paddingLeft={1}>
+                <Text bold color={FILE_COLOR[c.status]}>
+                  {c.status === '?' ? 'A' : c.status}
+                </Text>
+                <Text wrap="truncate-end">{nameOf(c.path)}</Text>
+                <Box flexGrow={1} />
+                {c.added > 0 && <Text color={C.ok}>+{c.added}</Text>}
+                {c.removed > 0 && <Text color={C.alert}>−{c.removed}</Text>}
+                <Text dimColor>{c.at !== null ? `vor ${span(now - c.at)}` : ''}</Text>
+              </Box>
+            ))}
+        </Box>
+      ))}
+      {reads.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Box flexDirection="row">
+            <Button plain dimColor label={`${isReadOpen ? '▾' : '▸'} Gelesen`} onPress={() => void toggleFold($, 'files-read-open')} />
+            <Box flexGrow={1} />
+            <Text dimColor>{reads.length} Dateien</Text>
+          </Box>
+          {isReadOpen &&
+            reads.map(r => (
+              <Box key={r.path} flexDirection="row" columnGap={1} paddingLeft={1}>
+                <Text dimColor>R</Text>
+                <Text dimColor wrap="truncate-end">
+                  {nameOf(r.path)}
+                </Text>
+                <Text dimColor wrap="truncate-end">
+                  {dirOf(r.path)}
+                </Text>
+                <Box flexGrow={1} />
+                <Text dimColor>{r.count}×</Text>
+              </Box>
+            ))}
+        </Box>
+      )}
+    </Box>
+  )
+}
+
+// Verlauf: a dot per turn with the prompt's opening, events in between, the newest last; the last 15.
+function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: SessionEvent[]) {
+  const rows = [...turns.map(t => ({ at: t.at, turn: t })), ...events.map(e => ({ at: e.at, event: e }))].sort((a, b) => a.at - b.at).slice(-15)
+  if (rows.length === 0) return <Text dimColor>Der Verlauf beginnt mit dem ersten fertigen Turn.</Text>
+  return (
+    <Box flexDirection="column">
+      {rows.map((row, i) => (
+        <Box key={`${row.at}-${i}`} flexDirection="row" columnGap={1}>
+          <Box width={5}>
+            <Text dimColor>{clock(row.at)}</Text>
+          </Box>
+          <Svg source={stepSvg('turn' in row ? 'turn' : 'event', i === rows.length - 1)} alt="" width={STEP.w} height={STEP.h} />
+          {'turn' in row && row.turn ? (
+            <Box flexDirection="column" flexShrink={1}>
+              <Text wrap="truncate-end">{row.turn.prompt || 'Turn'}</Text>
+              <Text dimColor wrap="truncate-end">
+                {elapsed(row.turn.seconds * 1000)} · {row.turn.tools} Tools · +{k(row.turn.ctxDelta)}
+                {row.turn.cacheHit > 0 ? ' · Cache ' : ''}
+                {row.turn.cacheHit > 0 && <Text color={row.turn.cacheHit < 70 ? C.warn : undefined}>{row.turn.cacheHit}%</Text>}
+              </Text>
+            </Box>
+          ) : (
+            <Box flexDirection="row" columnGap={1} flexShrink={1}>
+              <Text bold color={C.warn}>
+                {'event' in row && row.event?.kind === 'compact' ? '⇣ Compact' : '⇄ Modell'}
+              </Text>
+              <Text dimColor wrap="truncate-end">
+                {'event' in row ? row.event?.note : ''}
+              </Text>
+            </Box>
+          )}
+        </Box>
+      ))}
+    </Box>
+  )
+}
+
 export function registerPane(on: On) {
   on('command.run', { command: 'cockpit' }, async $ => {
     await $.ui.open({ id: PANE, title: paneTitle(await getLive($)) })
@@ -140,8 +355,13 @@ export function registerPane(on: On) {
     const plan = await getPlan($)
     const crew = await getCrew($)
     const liveAgents = crew.filter(a => a.state === 'running' || a.state === 'waiting').length
-    const openSteps = plan ? plan.steps.filter(s => s.status !== 'completed').length : 0
-    const groups = groupsOf(plan, crew, await getShells($), await getSubchats($), await $.clock.now())
+    const roster = await getRoster($)
+    const touches = await getTouches($)
+    const changedFiles = filesOf(env, touches)
+    const turns = await getTurns($)
+    const events = await getEvents($)
+    const repoOpen = await getRepoOpen($)
+    const groups = groupsOf(plan, crew, await getShells($), await getSubchats($), await getGoals($), await $.clock.now())
     await getTick($)
     const now = await $.clock.now()
     const since = tally.since
@@ -151,7 +371,7 @@ export function registerPane(on: On) {
       if (!l) return <Text dimColor>Wartet auf die erste Antwort…</Text>
       const badges: Record<string, { text: string; color: string } | null> = {
         agents: liveAgents > 0 ? { text: String(liveAgents), color: C.agent } : null,
-        plan: openSteps > 0 ? { text: String(openSteps), color: C.chat } : null,
+        files: changedFiles.length > 0 ? { text: String(changedFiles.length), color: C.shell } : null,
       }
       // A toggle: the track and the open tab's pill are one drawing, the names lie over it.
       const tabs = (
@@ -172,7 +392,7 @@ export function registerPane(on: On) {
               const badge = badges[t.key] ?? null
               return (
                 <Box key={t.key} flexGrow={1} width="25%" flexDirection="row" justifyContent="center" alignItems="flex-start">
-                  {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
+                  {t.key === tab ? <Button key={`tab-${t.key}`} plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button key={`tab-${t.key}`} plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
                   {/* The count, small and set to the top of the name's row, like an exponent. */}
                   {badge && (
                     <Text size="caption" weight="bold" color={badge.color}>
@@ -198,6 +418,7 @@ export function registerPane(on: On) {
         pace: number | null
         warning: { text: string; color: string } | null
         facts: [string, string][]
+        parts?: { name: string; tokens: number }[]
       }
       // Hovered, a dial's tile lights and a card with its details opens under it; the surface draws both, no hook
       // runs. Tile and card share a hover scope, so only the tile wakes the card.
@@ -230,6 +451,17 @@ export function registerPane(on: On) {
                 <Text>{fact}</Text>
               </Box>
             ))}
+            {d.parts && d.parts.length > 0 && <Svg source={partsSvg(d.parts)} alt="Aufteilung" height={8} />}
+            {d.parts?.map((part, i) => (
+              <Box key={part.name} flexDirection="row">
+                <Text color={PART_COLORS[i % PART_COLORS.length]}>■ </Text>
+                <Text dimColor wrap="truncate-end">
+                  {part.name}
+                </Text>
+                <Box flexGrow={1} />
+                <Text>{k(part.tokens)}</Text>
+              </Box>
+            ))}
           </Box>
         </Box>
       )
@@ -255,6 +487,35 @@ export function registerPane(on: On) {
         }
       }
 
+      // The repo card's details: the last commits, whether they are pushed, what is not committed.
+      const repoDetails = (env: Env) => (
+        <Box flexDirection="column" marginTop={1}>
+          <Text dimColor>Letzte Commits</Text>
+          {env.commits.map(c => (
+            <Box key={c.hash} flexDirection="row" columnGap={1}>
+              <Text dimColor mono>
+                {c.hash}
+              </Text>
+              <Text wrap="truncate-end">{c.subject}</Text>
+              <Box flexGrow={1} />
+              <Text dimColor>{c.age.replace(/ ago$/, '')}</Text>
+            </Box>
+          ))}
+          {env.unpushed === null ? <Text dimColor>Kein Upstream-Branch</Text> : env.unpushed === 0 ? <Text color={C.ok}>● gepusht</Text> : <Text color={C.warn}>↑{env.unpushed} nicht gepusht</Text>}
+          {env.files.length > 0 && <Text dimColor>Nicht committet</Text>}
+          {env.files.slice(0, 6).map(file => (
+            <Box key={file.path} flexDirection="row" columnGap={1}>
+              <Text color={FILE_COLOR[file.status]}>{file.status}</Text>
+              <Text wrap="truncate-start">{file.path}</Text>
+              <Box flexGrow={1} />
+              {file.added > 0 && <Text color={C.ok}>+{file.added}</Text>}
+              {file.removed > 0 && <Text color={C.alert}>−{file.removed}</Text>}
+            </Box>
+          ))}
+          {env.files.length > 6 && <Text dimColor>… {env.files.length - 6} weitere</Text>}
+        </Box>
+      )
+
       const dials: Dial[] = [
         {
           key: 'ctx',
@@ -271,6 +532,7 @@ export function registerPane(on: On) {
             ['Frei', k(Math.max(0, l.ctxWindow - l.ctxTokens))],
             ['Wetter', `${w.glyph} ${w.word}`],
           ],
+          ...(l.ctxParts ? { parts: l.ctxParts.slice(0, 6) } : {}),
         },
         ...(five ? [limitDial(five, '5h', C.five_hour)] : []),
         ...(seven ? [limitDial(seven, '7d', C.seven_day)] : []),
@@ -284,7 +546,7 @@ export function registerPane(on: On) {
             {tabs}
 
             {env?.repo && (
-              <Box flexDirection="row" columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+              <Box flexDirection="row" columnGap={1} alignItems="flex-start" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
                 <Svg source={repoSvg(env.isGithub, '#ececec')} alt={env.isGithub ? 'GitHub' : 'Git'} width={20} height={20} />
                 <Box flexDirection="column" flexShrink={1}>
                   <Box flexDirection="row" columnGap={1}>
@@ -301,14 +563,19 @@ export function registerPane(on: On) {
                     {env.added > 0 && <Text color={C.ok}>+{env.added}</Text>}
                     {env.removed > 0 && <Text color={C.alert}>−{env.removed}</Text>}
                   </Box>
+                  {repoOpen && repoDetails(env)}
                 </Box>
+                <Box flexGrow={1} />
+                <Button plain dimColor label={repoOpen ? '▴' : '▾'} onPress={() => void toggleRepoOpen($)} />
               </Box>
             )}
 
             <Box flexDirection="row">{dials.map(dial)}</Box>
           </Box>
 
-          {tab !== 'session' && <Text dimColor>Kommt bald.</Text>}
+          {tab === 'agents' && agentsTab({ Box, Text, Svg, Button }, roster, now)}
+          {tab === 'files' && filesTab($, { Box, Text, Svg, Button }, changedFiles, touches, folded, now)}
+          {tab === 'history' && historyTab({ Box, Text, Svg, Button }, turns, events)}
           {tab === 'session' && (
             <Box flexDirection="column" rowGap={1}>
               <Box flexDirection="row" columnGap={1} alignItems="center">
