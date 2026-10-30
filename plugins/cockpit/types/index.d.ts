@@ -54,7 +54,8 @@ export type Tally = { turns: number; tools: number; since: number | null }
 export type Shell = { id: string; title: string; startedAt: number; endedAt: number | null }
 
 // A session the desktop app started from this one.
-export type Subchat = { title: string; at: number }
+// model: the one it was started on (this session's when none was named).
+export type Subchat = { title: string; at: number; model?: string }
 
 export type Turn = {
   at: number
@@ -89,9 +90,11 @@ export type AgentRow = {
 
 // Claude's own task list (TaskCreate/TaskUpdate or TodoWrite), mirrored as a plan.
 export type StepStatus = 'pending' | 'in_progress' | 'completed'
-export type Step = { id: string; title: string; status: StepStatus; startedAt?: number; endedAt?: number }
-// idle: the main conversation's tool calls since Claude last touched the list, to see a step left hanging.
-export type Plan = { title: string; steps: Step[]; startedAt: number; idle?: number }
+// stage: the progress tool's stage a sub-step belongs to; a plain stage is its own.
+export type Step = { id: string; title: string; status: StepStatus; startedAt?: number; endedAt?: number; stage?: string }
+// idle: the main conversation's tool calls since Claude last touched the list, to see a step left hanging;
+// nudged: Claude was reminded of it since.
+export type Plan = { title: string; steps: Step[]; startedAt: number; idle?: number; nudged?: boolean }
 // A plan Claude reports with cockpit's own progress tool (option planTool): one bar per id, a stage per step.
 export type ToolPlan = Plan & { id: string }
 
@@ -104,6 +107,7 @@ declare module 'claude-code' {
       crew: Shaped<AgentRow[]>
       plan: Shaped<Plan | null>
       bars: ToolPlan[]
+      hidden: Record<string, number>
       tick: number
       env: Shaped<Env | null>
       tally: Tally

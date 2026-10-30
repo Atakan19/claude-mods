@@ -50,13 +50,15 @@ import {
 } from './progress'
 import { t } from './i18n'
 import { lastEnd, planState, stuckStep } from './plan'
-import { bumpTick, dropDoneCrew, getBars, getCrew, getLive, getPlan, getRunning, getTick, getTurns, setBars, setPlan } from './state'
+import { bumpTick, getBars, getCrew, getHidden, getLive, getPlan, getRunning, getTick, getTurns, setHidden } from './state'
 
 type Ui = Pick<Elements['desktop'], 'Box' | 'Text' | 'Svg' | 'Button'>
 
 const PLAN_BAR = 'plan'
 const AGENTS_BAR = 'agents'
 const TOOL_BAR = 'tool:'
+// The twig a bar hanging under the task list starts with, as the pane's cards hang off their group.
+const HANG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"><path d="M3 0V6q0 5 5 5H14" fill="none" stroke="#8b6fe0" stroke-opacity=".7" stroke-width="1.5"/></svg>'
 
 // Which pills the person kept, from /config; fixed per load, as a change of options reloads the module.
 let PILLS = { context: true, limit: true, cache: true, agents: true }
@@ -75,7 +77,8 @@ export function registerBand(on: On, options: BandOptions = {}) {
     const running = await getRunning($)
     const now = await $.clock.now()
     const plan = await getPlan($)
-    const bars = [...barsOf(plan, crew, now), ...toolBarsOf(await getBars($), now)]
+    const hidden = await getHidden($)
+    const bars = [...barsOf(plan, crew, now), ...toolBarsOf(await getBars($), now)].filter(b => hidden[b.id] !== b.startedAt)
     // A finished task list folds away like the strips: draw once more when it is due.
     if (plan && plan.steps.length > 0 && planState(plan).done) settleBy($, lastEnd(plan) + FOLD_MS + 100, now)
 
@@ -110,10 +113,12 @@ const runOf = (a: AgentRow): AgentRun => ({
   ...(a.effort ? { effort: a.effort } : {}),
 })
 
-// Steps done of all, shown where zycck shows the percent: 0/3, 1/3 …
+// The step under way of all, counted from 1 as the pane counts its steps: 1/3, 2/3 …; done ones of all
+// when none is under way (3/3 at the end).
 function countOf(p: Bar) {
   const steps = p.stages.flatMap(s => s.steps)
-  return `${steps.filter(s => s.status === 'done').length}/${steps.length}`
+  const at = steps.findIndex(s => s.status === 'active')
+  return `${at >= 0 ? at + 1 : steps.filter(s => s.status === 'done').length}/${steps.length}`
 }
 
 // Filler a short label can do without.
@@ -194,30 +199,42 @@ function barsOf(plan: Plan | null, crew: AgentRow[], now: number): Bar[] {
 // The plans reported with the progress tool, under the task list: each step a stage of its own, so the
 // track has a mark between them and the pill names the stage. A finished one folds away with the strips.
 function toolBarsOf(list: ToolPlan[], now: number): Bar[] {
-  return list
-    .filter(p => !planState(p).done || now - lastEnd(p) <= FOLD_MS)
-    .map(p => {
-      const done = planState(p).done
-      return {
-        id: TOOL_BAR + p.id,
-        title: p.title,
-        kind: 'plan',
-        stages: p.steps.map(s => ({
-          name: s.title,
-          steps: [{ title: '', status: s.status === 'completed' ? 'done' : s.status === 'in_progress' ? 'active' : 'pending', substeps: [], ...(s.endedAt !== undefined ? { doneAt: s.endedAt } : {}) }],
-        })),
-        state: done ? 'done' : 'running',
-        note: null,
-        startedAt: p.startedAt,
-        endedAt: done ? lastEnd(p) : null,
-      }
-    })
+  return list.filter(p => !planState(p).done || now - lastEnd(p) <= FOLD_MS).map(p => toolBar(p))
 }
 
-async function closeBar($: EngineInterface, id: string) {
-  if (id === PLAN_BAR) await setPlan($, () => null)
-  else if (id.startsWith(TOOL_BAR)) await setBars($, list => list.filter(b => b.id !== id.slice(TOOL_BAR.length)))
-  else await dropDoneCrew($, Infinity)
+// One progress plan as zycck's bar; the pane draws the same one in a task's card, under an id of its own.
+export function toolBar(p: ToolPlan, id = TOOL_BAR + p.id): Bar {
+  const done = planState(p).done
+  // Steps of one stage in a row make one stage of the bar: its sub-steps are dots, the stage a mark.
+  const stages: Bar['stages'] = []
+  for (const s of p.steps) {
+    const name = s.stage ?? s.title
+    const step = {
+      title: s.title === name ? '' : s.title,
+      status: s.status === 'completed' ? ('done' as const) : s.status === 'in_progress' ? ('active' as const) : ('pending' as const),
+      substeps: [],
+      ...(s.endedAt !== undefined ? { doneAt: s.endedAt } : {}),
+    }
+    const last = stages[stages.length - 1]
+    if (last && last.name === name) last.steps.push(step)
+    else stages.push({ name, steps: [step] })
+  }
+  return {
+    id,
+    title: p.title,
+    kind: 'plan',
+    stages,
+    state: done ? 'done' : 'running',
+    note: null,
+    startedAt: p.startedAt,
+    endedAt: done ? lastEnd(p) : null,
+  }
+}
+
+// The ✕ hides the bar in the band only: the pane keeps the list, the plan and the agents. The bar is
+// known by its start, so a new list or batch under the same id shows again.
+async function closeBar($: EngineInterface, p: Bar) {
+  await setHidden($, hidden => ({ ...hidden, [p.id]: p.startedAt }))
 }
 
 // A glide or a strip's morph is drawn once more when it ends, standing.
@@ -359,10 +376,13 @@ function barRows($: EngineInterface, { Box, Text, Svg, Button }: Ui, list: Bar[]
           p.state === 'done'
             ? `${p.title}: fertig${p.endedAt ? ` in ${elapsed(p.endedAt - p.startedAt)}` : ''}`
             : `${p.title}: Schritt ${w.step} von ${w.stageSize}, ${pct}%`
-        const line = i > 0 ? [<Svg key={`div-${p.id}`} source={divider} alt="divider" width={total} height={1} />] : []
+        // A progress tool bar belongs to the task list above it: no divider, a twig into it instead.
+        const isUnder = p.id.startsWith(TOOL_BAR) && list.some(b => b.id === PLAN_BAR)
+        const line = i > 0 && !isUnder ? [<Svg key={`div-${p.id}`} source={divider} alt="divider" width={total} height={1} />] : []
         return [
           ...line,
           <Box key={`bar-${p.id}`} flexDirection="row" alignItems={v ? 'flex-start' : 'center'} gap={1}>
+            {isUnder && <Svg source={HANG} alt={t().branch} width={14} height={14} />}
             <Text color={stateColor(p.state)}>{STATE_GLYPH[p.state]}</Text>
             <Box flexShrink={0}>
               <Text>{p.title}</Text>
@@ -393,7 +413,7 @@ function barRows($: EngineInterface, { Box, Text, Svg, Button }: Ui, list: Bar[]
               ))}
             </Box>
             <Text dimColor>{countOf(p)}</Text>
-            <Button key={`close-${p.id}`} plain dimColor label="✕" onPress={() => void closeBar($, p.id)} />
+            <Button key={`close-${p.id}`} plain dimColor label="✕" onPress={() => void closeBar($, p)} />
           </Box>,
         ]
       })}

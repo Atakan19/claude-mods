@@ -16,6 +16,8 @@ const running = atom({ plugin: 'cockpit', key: 'running' } as const, { tools: 0,
 const crew = atom({ plugin: 'cockpit', key: 'crew' } as const, [], { shape: 'crew-2' })
 // Tagged: a plan stored by the earlier plan tool has another shape and reads as none.
 const plan = atom({ plugin: 'cockpit', key: 'plan' } as const, null, { shape: 'plan-2' })
+// Bars the band's ✕ hid, by id, with the start of the one hidden.
+const hidden = atom({ plugin: 'cockpit', key: 'hidden' } as const, {})
 // The plans reported with the progress tool, one per id.
 const bars = atom({ plugin: 'cockpit', key: 'bars' } as const, [])
 // Bumped every 30 s so countdowns redraw without a turn.
@@ -172,6 +174,12 @@ export async function setPlan($: EngineInterface, fn: (prev: Plan | null) => Pla
 // One more tool call of the main conversation while the list stood still.
 export async function countIdle($: EngineInterface) {
   await update($, plan, p => (p && p.steps.some(s => s.status !== 'completed') ? { ...p, idle: (p.idle ?? 0) + 1 } : p))
+}
+export async function getHidden($: EngineInterface) {
+  return read($, hidden)
+}
+export async function setHidden($: EngineInterface, fn: (prev: Record<string, number>) => Record<string, number>) {
+  await update($, hidden, fn)
 }
 export async function getBars($: EngineInterface) {
   return read($, bars)

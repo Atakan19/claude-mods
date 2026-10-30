@@ -94,6 +94,28 @@ export function finishPlan(prev: Plan | null, now: number): Plan | null {
 // When the last step of a plan ended.
 export const lastEnd = (p: Plan) => Math.max(p.startedAt, ...p.steps.map(s => s.endedAt ?? 0))
 
+// The tool's steps as the plan's: a stage given as a plain label is one step; one given as
+// {label, substeps} is a step per sub-step, each carrying its stage. Ids keep finished steps across a resend.
+const cut = (s: unknown) => (typeof s === 'string' ? s.trim().slice(0, 24) : '')
+function toolSteps(list: unknown[], base: Plan | null, now: number): Step[] {
+  const items: { id: string; title: string; stage: string }[] = []
+  for (const s of list) {
+    const label = cut(typeof s === 'string' ? s : (s as { label?: unknown } | null)?.label)
+    if (!label) continue
+    const subs = typeof s === 'object' && s && Array.isArray((s as { substeps?: unknown }).substeps) ? (s as { substeps: unknown[] }).substeps.map(cut).filter(Boolean) : []
+    if (subs.length === 0) items.push({ id: label, title: label, stage: label })
+    else for (const sub of subs) items.push({ id: `${label} › ${sub}`, title: sub, stage: label })
+  }
+  const steps: Step[] = items.map(it => {
+    const old = base?.steps.find(s => s.id === it.id)
+    const status = old?.status ?? 'pending'
+    return { ...it, status, ...stamp(old, status, now) }
+  })
+  const first = steps.findIndex(s => s.status === 'pending')
+  if (first >= 0 && !steps.some(s => s.status === 'in_progress')) steps[first] = { ...steps[first]!, status: 'in_progress', ...stamp(steps[first], 'in_progress', now) }
+  return steps
+}
+
 // The progress tool's call: steps (re)make the plan, keeping finished steps by label; next and done move it.
 // A finished plan sent again starts over. A string is the refusal the model reads.
 export function fromTool(prev: ToolPlan | null, args: Record<string, unknown>, now: number): ToolPlan | string {
@@ -102,11 +124,8 @@ export function fromTool(prev: ToolPlan | null, args: Record<string, unknown>, n
   const base = prev && !planState(prev).done ? prev : null
   let p: Plan | null = base
   if (Array.isArray(args.steps)) {
-    const labels = args.steps.filter((s): s is string => typeof s === 'string' && s.trim() !== '').map(s => s.trim().slice(0, 24))
-    const items = labels.map(content => ({ content, status: base?.steps.find(s => s.title === content)?.status ?? ('pending' as StepStatus) }))
-    const first = items.find(i => i.status === 'pending')
-    if (first && !items.some(i => i.status === 'in_progress')) first.status = 'in_progress'
-    p = fromTodos(base, items, now)
+    const steps = toolSteps(args.steps, base, now)
+    p = steps.length > 0 ? { title: base?.title ?? id, steps, startedAt: base?.startedAt ?? now } : null
   }
   if (!p) return `progress: no bar "${id}" yet; create it with title and steps.`
   if (args.next === true) p = fromAppPlan(p, { advance: true }, now) ?? p
@@ -117,9 +136,9 @@ export function fromTool(prev: ToolPlan | null, args: Record<string, unknown>, n
 
 const TOOL = 'progress'
 // What the model reads: when to use it and how to name the stages, since the labels are all the bar shows.
-const TOOL_DESCRIPTION = `Live progress bar above the prompt, one per id. Use it for work with 3 or more distinct stages (for example build, deploy, verify), alongside your task list.
-Create: {id, title, steps}. steps are the stage labels the bar shows: 1-2 words, at most 12 characters, in the user's language, the key word first ("Build", "Deploy", "Tests"), never a sentence. title: at most 4 words. The first step starts active.
-Move: {id, next: true} when the active step is finished; {id, done: true} when all is finished. Resend steps under the same id when the plan changes; finished steps keep their state by label.
+const TOOL_DESCRIPTION = `Live progress bar above the prompt, one per id. Use it alongside your task list for work with 3 or more distinct stages (for example build, deploy, verify), and whenever a step of your task list has sub-steps of its own: open a bar for that step and show its sub-steps.
+Create: {id, title, steps}. steps are the stage labels the bar shows: 1-2 words, at most 12 characters, in the same language as your task list, the key word first ("Build", "Deploy", "Tests"), never a sentence. A stage with parts is {label, substeps: [...]}, its sub-steps named by the same rules. title: at most 4 words. The first step starts active.
+Move: {id, next: true} when the active step (or sub-step) is finished; {id, done: true} when all is finished. Resend steps under the same id when the plan changes; finished steps keep their state by label.
 Never describe the bar to the user.`
 
 // Option planTool, called from the one session.start hook in data.ts. Off by default, as the
@@ -134,11 +153,22 @@ export async function startPlanTool($: EngineInterface) {
       properties: {
         id: { type: 'string', description: 'Bar id, reused for updates' },
         title: { type: 'string' },
-        steps: { type: 'array', items: { type: 'string' }, description: 'Stage labels, 1-2 words each' },
-        next: { type: 'boolean', description: 'Active stage finished, start the next one' },
+        steps: {
+          type: 'array',
+          description: 'Stage labels, 1-2 words each; a stage with parts as {label, substeps}',
+          items: {
+            anyOf: [
+              { type: 'string' },
+              { type: 'object', required: ['label'], properties: { label: { type: 'string' }, substeps: { type: 'array', items: { type: 'string' } } } },
+            ],
+          },
+        },
+        next: { type: 'boolean', description: 'Active step or sub-step finished, start the next one' },
         done: { type: 'boolean', description: 'All stages finished' },
       },
     },
+    // In the prompt's list, not behind ToolSearch: a deferred tool is rarely reached for.
+    isDeferred: false,
   })
 }
 
@@ -152,9 +182,9 @@ export function registerPlanTool(on: On) {
       const id = typeof args.id === 'string' ? args.id.trim().slice(0, 40) : ''
       res.out = fromTool(list.find(b => b.id === id) ?? null, args, now)
       if (typeof res.out === 'string') return list
-      // Finished bars long folded away make room.
-      const kept = list.filter(b => b.id !== id && !(planState(b).done && now - lastEnd(b) > FOLD_MS))
-      return [...kept, res.out]
+      // Finished bars stay for the task cards that show them (the band hides them); the newest 20 are kept.
+      const kept = list.filter(b => b.id !== id)
+      return [...kept, res.out].slice(-20)
     })
     const p = res.out
     if (typeof p === 'string') return { deny: p }
@@ -162,7 +192,7 @@ export function registerPlanTool(on: On) {
     // A finished bar folds away a few seconds later: draw once more then.
     if (done) $.clock.after(FOLD_MS + 100, () => void bumpTick($).catch(() => {}))
     const active = p.steps.find(s => s.status === 'in_progress')
-    return { result: `${p.id}: ${finished}/${p.steps.length}${done ? ', done' : active ? `, active "${active.title}"` : ''}` }
+    return { result: `${p.id}: ${finished}/${p.steps.length}${done ? ', done' : active ? `, active "${active.id}"` : ''}` }
   })
 }
 
@@ -179,7 +209,7 @@ export const LIST_TOOLS = new Set(['TodoWrite', 'TaskCreate', 'TaskUpdate', 'Tas
 async function movePlan($: EngineInterface, fn: (prev: Plan | null) => Plan | null) {
   await setPlan($, prev => {
     const next = fn(prev)
-    return next && next !== prev ? { ...next, idle: 0 } : next
+    return next && next !== prev ? { ...next, idle: 0, nudged: false } : next
   })
 }
 
@@ -194,18 +224,19 @@ export function stuckStep(p: Plan | null, now: number): Step | null {
   return idle >= STUCK_CALLS || (idle >= 3 && step.startedAt !== undefined && now - step.startedAt >= STUCK_MS) ? step : null
 }
 
-// Reads Claude's own task tools after they ran; the tool's result is returned whatever happens here:
-// a drawing must never cost a task call. Only while a step hangs does one line reach the model's prompt.
-export function registerPlan(on: On) {
-  on('prompt.compose', async ($, e, next) => {
-    const r = await next(e)
-    const p = await getPlan($)
-    const step = stuckStep(p, await $.clock.now())
-    if (!step) return r
-    const text = `Your task list still shows "${step.title}" as in progress after ${p?.idle ?? 0} tool calls. If you moved on, update the list now; if not, carry on.`
-    return { ...r, sections: [...r.sections, { id: 'cockpit:stuck', text, scope: 'session' as const }] }
-  })
+// The line a hanging step earns, once until Claude moves the list; it rides the next tool result,
+// as the system prompt is not read again within a turn.
+export async function nudgeIfStuck($: EngineInterface): Promise<string | null> {
+  const p = await getPlan($)
+  const step = stuckStep(p, await $.clock.now())
+  if (!p || !step || p.nudged) return null
+  await setPlan($, prev => prev && { ...prev, nudged: true })
+  return `cockpit: your task list still shows "${step.title}" as in progress after ${p.idle ?? 0} tool calls. If you moved on, update the list now; if not, carry on.`
+}
 
+// Reads Claude's own task tools after they ran; the tool's result is returned whatever happens here:
+// a drawing must never cost a task call.
+export function registerPlan(on: On) {
   on('tool.call', { tool: 'TodoWrite' }, async ($, e, next) => {
     const r = await next(e)
     try {

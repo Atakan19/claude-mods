@@ -125,10 +125,11 @@ export function beadsSvg(items: { state: RingState; color: string }[]) {
 }
 // A card's twig for its lines of text: a card of two lines takes TWIG.leaf, each line more or less a line's height.
 export const leafHeight = (lines: number) => TWIG.leaf + (lines - 2) * TWIG.line
-// In front of a card: down from the line above, round into the card at its first lines; the group's last one stops there.
+// In front of a card: down from the line above, round into the card at its title line, the same height
+// whether the card is folded open or not; the group's last one stops there.
 export function twigSvg(isLast: boolean, color: string, leaf: number = TWIG.leaf) {
   const { w, x } = TWIG
-  const mid = Math.min(leaf, TWIG.leaf) / 2
+  const mid = leafHeight(1) / 2
   return svg(w, leaf, `<path d="M${x} 0V${mid - 8}q0 8 8 8H${w}" ${stroke(color)}/>${isLast ? '' : `<path d="M${x} ${mid}V${leaf}" ${stroke(color)}/>`}`)
 }
 

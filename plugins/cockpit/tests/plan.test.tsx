@@ -147,7 +147,7 @@ test('a step counts as hanging after many calls, or a few over a long time', asy
   expect(stuckStep({ ...p, idle: 3 }, 10 * 60e3)?.title).toBe('Build')
 })
 
-test('a list left standing gets one line in the prompt until Claude moves it', async ($, on) => {
+test('a list left standing turns its pill amber after 15 calls, until it moves', { options: { language: 'de' } }, async ($, on) => {
   mock.clock(on, { now: 1_000_000 })
   on('command.register', () => ({ value: { command: 'cockpit' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
@@ -157,18 +157,83 @@ test('a list left standing gets one line in the prompt until Claude moves it', a
   }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('tool.call', () => ({ result: {} }))
-  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'hi', scope: 'shared' as const }] }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine</Text>
+  })
 
-  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   const todos = [
     { content: 'Build', status: 'in_progress', activeForm: '' },
     { content: 'Ship', status: 'pending', activeForm: '' },
   ]
+  // The state mark in front of the bar: ● running, ? amber.
+  const mark = async () => {
+    const band = await $.ui.mount({
+      plugin: 'cockpit',
+      component: 'AbovePrompt',
+      surface: 'terminal',
+      props: { hasSurvey: false, isWorking: true, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} },
+    })
+    const found = (await band.find({ type: 'Text', text: '?' })) ? '?' : (await band.find({ type: 'Text', text: '●' })) ? '●' : ''
+    await band.unmount()
+    return found
+  }
   await $.tool.call({ tool: 'TodoWrite', todos })
-  const input = { model: 'claude-opus-5-5', promptModel: 'claude-opus-5-5', surfaces: [], tools: [], outputStyle: null, traits: [] }
-  const stuck = async () => (await $.prompt.compose(input)).sections.some(s => s.id === 'cockpit:stuck')
-  for (let i = 0; i < 15; i++) await $.tool.call({ tool: 'Read', file_path: '/a' })
-  expect(await stuck()).toBe(true)
+  for (let i = 0; i < 14; i++) await $.tool.call({ tool: 'Read', file_path: '/a' })
+  expect(await mark()).toBe('●')
+  await $.tool.call({ tool: 'Read', file_path: '/a' })
+  expect(await mark()).toBe('?')
   await $.tool.call({ tool: 'TodoWrite', todos: [{ ...todos[0], status: 'completed' }, { ...todos[1], status: 'in_progress' }] })
-  expect(await stuck()).toBe(false)
+  expect(await mark()).toBe('●')
+})
+
+test('a progress stage with sub-steps moves sub-step by sub-step', async () => {
+  let p = fromTool(null, { id: 'ship', title: 'Release', steps: [{ label: 'Build', substeps: ['Compile', 'Bundle'] }, 'Deploy'] }, 0)
+  if (typeof p === 'string') throw new Error(p)
+  expect(p.steps.map(s => [s.stage, s.title, s.status])).toEqual([
+    ['Build', 'Compile', 'in_progress'],
+    ['Build', 'Bundle', 'pending'],
+    ['Deploy', 'Deploy', 'pending'],
+  ])
+  p = fromTool(p, { id: 'ship', next: true }, 10) as Exclude<typeof p, string>
+  expect(p.steps.find(s => s.status === 'in_progress')?.id).toBe('Build › Bundle')
+  // Resent with the same stage, the finished sub-step keeps its state.
+  p = fromTool(p, { id: 'ship', steps: [{ label: 'Build', substeps: ['Compile', 'Bundle', 'Sign'] }, 'Deploy'] }, 20) as Exclude<typeof p, string>
+  expect(p.steps.map(s => s.status)).toEqual(['completed', 'in_progress', 'pending', 'pending'])
+})
+
+test("the band's ✕ hides a bar there only; the pane keeps the list", { options: { language: 'de' } }, async ($, on) => {
+  mock.clock(on, { now: 1_000_000 })
+  on('command.register', () => ({ value: { command: 'cockpit' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('settings.read', () => ({ value: { model: 'opus' } }))
+  on('session.usage', () => ({
+    value: { startedAt: 0, context: { tokens: 1000, window: 200_000, percent: 1 }, rateLimits: [], cost: { usd: 0 } },
+  }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('tool.call', () => ({ result: {} }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine</Text>
+  })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.tool.call({ tool: 'TodoWrite', todos: [{ content: 'Folien planen', status: 'in_progress', activeForm: '' }] })
+  const props = { hasSurvey: false, isWorking: true, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} }
+  const band = await $.ui.mount({ plugin: 'cockpit', component: 'AbovePrompt', surface: 'desktop', props })
+  await band.press({ key: 'close-plan' })
+  await band.unmount()
+  const after = await $.ui.mount({ plugin: 'cockpit', component: 'AbovePrompt', surface: 'desktop', props })
+  expect(await after.find({ type: 'Text', text: /Aufgaben/ })).toBeFalsy()
+  await after.unmount()
+  const pane = await $.ui.mount({
+    plugin: 'cockpit',
+    component: 'Pane',
+    requestId: 'cockpit',
+    surface: 'desktop',
+    props: { title: 'Cockpit', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
+  })
+  expect(await pane.find({ type: 'Text', text: /Folien planen/ })).toBeTruthy()
+  await pane.unmount()
 })

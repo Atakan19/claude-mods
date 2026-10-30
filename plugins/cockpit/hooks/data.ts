@@ -3,7 +3,7 @@ import type { EngineInterface, On, SessionUsage } from 'claude-code'
 import type { Env, GitFile, Live, Turn } from '../types'
 import { cacheLeft, cacheTtlMs, k, modelName, span } from './format'
 import { retitlePane, startPane } from './pane'
-import { clearDonePlan, LIST_TOOLS, startPlanTool } from './plan'
+import { clearDonePlan, LIST_TOOLS, nudgeIfStuck, startPlanTool } from './plan'
 import { FOLD_MS } from './progress'
 import { chooseLang, setLang, t } from './i18n'
 import { play } from './sound'
@@ -217,7 +217,8 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     try {
       const title = (e as { title?: unknown }).title
       if (e.agentId === undefined && !('deny' in r) && !r.isError && typeof title === 'string') {
-        await addSubchat($, { title, at: await $.clock.now() })
+        const model = (e as { model?: unknown }).model
+        await addSubchat($, { title, at: await $.clock.now(), model: typeof model === 'string' ? model : (await getLive($))?.model })
       }
     } catch {}
     return r
@@ -364,6 +365,9 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
       if (isCrew && (await getCrew($)).find(a => a.id === agentId)?.state === 'waiting') {
         await upsertCrew($, { id: agentId, state: 'running', tool: e.tool })
       }
+      // A step left hanging: one line for Claude after this result.
+      const nudge = agentId === undefined && !('deny' in r) && !LIST_TOOLS.has(e.tool) ? await nudgeIfStuck($) : null
+      if (nudge) return { ...r, context: [...(r.context ?? []), nudge] }
     } catch {}
 
     return r

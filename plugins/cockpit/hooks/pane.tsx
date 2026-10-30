@@ -1,6 +1,6 @@
 import type { Elements, EngineInterface, On, RenderElement } from 'claude-code'
 
-import type { Activity, AgentRow, Env, GitFile, Goal, Limit, Live, Plan, SessionEvent, Shell, Subchat, Touch, Turn } from '../types'
+import type { Activity, AgentRow, Env, GitFile, Goal, Limit, Live, Plan, SessionEvent, Shell, Subchat, ToolPlan, Touch, Turn } from '../types'
 import { bar, clock, elapsedOf, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
 import type { Role } from './clawd'
@@ -10,11 +10,11 @@ import {
   EXT_BADGE,
   FILE_TWIG,
   SQUARES,
+  squaresSvg,
   durationSvg,
   extSvg,
   fileTwigSvg,
   folderSvg,
-  squaresSvg,
   C,
   PART_COLORS,
   STEP,
@@ -22,7 +22,6 @@ import {
   toggleSvg,
   beadsWidth,
   DIAL,
-  RING,
   TWIG,
   beadsSvg,
   coreSvg,
@@ -38,10 +37,13 @@ import {
   weatherOf,
 } from './look'
 import { t } from './i18n'
-import { elapsed } from './progress'
+import { toolBar } from './band'
+import { elapsed, liveSource, TRACK_H, trackSvg } from './progress'
 import {
   HISTORY,
+  bumpTick,
   getActivity,
+  getBars,
   PANE,
   getCrew,
   getEnv,
@@ -67,6 +69,11 @@ import {
 
 // Finished work stays on its branch this long, pale, then leaves the tree.
 const KEEP_MS = 3 * 60e3
+// The ring on a Session card: a little smaller than the big one, so a card of one line stays low.
+const LEAF_RING = 20
+// Rows the pane keeps at least: the rings sit 6 rows down and the context card can run 16 more.
+const PANE_MIN_ROWS = 26
+const LEAF_BLANK = `<svg xmlns="http://www.w3.org/2000/svg" width="${LEAF_RING}" height="1"/>`
 // Session first; the others hold a place until their content is settled.
 const TABS = ['session', 'agents', 'files'].map(key => ({
   key,
@@ -93,6 +100,17 @@ const modelLine = (l: Live) => `${modelName(l.model)}${l.effort ? ` (${capital(l
 export async function startPane($: EngineInterface) {
   await $.command.register({ name: 'cockpit', description: t().openPane })
   void $.ui.open({ id: PANE, title: paneTitle(await getLive($)) })
+  // While a step, an agent or a command runs, the pane's clocks move every second; idle, data.ts's
+  // 30-second tick is enough. Only while the pane is open.
+  $.clock.every(1000, () => {
+    void (async () => {
+      const busy =
+        (await getPlan($))?.steps.some(s => s.status === 'in_progress') ||
+        (await getCrew($)).some(a => a.endedAt === null) ||
+        (await getShells($)).some(s => s.endedAt === null)
+      if (busy && (await $.ui.panes()).some(p => p.id === PANE)) await bumpTick($)
+    })().catch(() => {})
+  })
 }
 
 // A new model or effort renames the pane; opening an open id only retitles it, and a closed pane stays closed.
@@ -101,7 +119,7 @@ export async function retitlePane($: EngineInterface) {
 }
 
 // details: the lines a press on the card's title folds open, name and value.
-type Leaf = { key: string; title: string; sub: string; time: string; state: RingState; color: string; details: [string, string][] }
+type Leaf = { key: string; title: string; time: string; state: RingState; color: string; details: [string, string][]; bars?: ToolPlan[] }
 type Group = { key: string; title: string; count: string; color: string; current?: string; leaves: Leaf[] }
 
 const isRecent = (endedAt: number | null, now: number) => endedAt === null || now - endedAt < KEEP_MS
@@ -136,7 +154,7 @@ function repoLine(env: Env) {
 const tallyLine = (n: { turns: number; tools: number }) => `${t().turns(n.turns)} · ${t().tools(n.tools)}`
 
 // What hangs off the session: the task list, the background work, the chats it started.
-function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: Subchat[], goals: Goal[], now: number): Group[] {
+function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: Subchat[], goals: Goal[], bars: ToolPlan[], now: number): Group[] {
   const groups: Group[] = []
   // Only goals set out loud (/goal, or Claude's proposal once set); the engine never says one is reached.
   if (goals.length > 0) {
@@ -149,7 +167,6 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
       leaves: goals.map((g, i) => ({
         key: `g-${i}`,
         title: g.condition,
-        sub: g.endedAt === null ? `${g.by === 'you' ? t().byYou : t().byClaude} · ${now - g.at < 60e3 ? t().justNow : t().since(span(now - g.at))}` : t().ended,
         time: '',
         state: g.endedAt === null ? 'running' : 'done',
         color: GOAL,
@@ -162,18 +179,18 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
     })
   }
   if (plan && plan.steps.length > 0) {
-    const done = plan.steps.filter(s => s.status === 'completed').length
+    // As the band counts: the step under way, from 1; done ones when none is.
+    const at = plan.steps.findIndex(s => s.status === 'in_progress')
+    const place = at >= 0 ? at + 1 : plan.steps.filter(s => s.status === 'completed').length
     groups.push({
       key: 'plan',
       title: t().tasks,
-      count: `${done}/${plan.steps.length}`,
+      count: `${place}/${plan.steps.length}`,
       color: C.chat,
       current: plan.steps.find(s => s.status === 'in_progress')?.title,
       leaves: plan.steps.map((s, i) => ({
         key: `p-${s.id}`,
         title: s.title,
-        // The ring shows the state; the card stays one line until it is folded open.
-        sub: '',
         time: s.startedAt && (s.endedAt ?? now) - s.startedAt >= 1000 ? elapsed((s.endedAt ?? now) - s.startedAt) : '',
         state: s.status === 'completed' ? 'done' : s.status === 'in_progress' ? 'running' : 'pending',
         color: C.chat,
@@ -183,6 +200,8 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
           ...(s.startedAt ? [[t().started, clock(s.startedAt)] as [string, string]] : []),
           ...(s.startedAt ? [[s.endedAt ? t().duration : t().runsFor, elapsed((s.endedAt ?? now) - s.startedAt)] as [string, string]] : []),
         ],
+        // The progress bars opened while this step ran.
+        bars: bars.filter(b => s.startedAt !== undefined && b.startedAt >= s.startedAt && b.startedAt <= (s.endedAt ?? now)),
       })),
     })
   }
@@ -191,11 +210,11 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
     .map(a => ({
       key: `a-${a.id}`,
       title: a.description,
-      sub: [a.type, a.model && modelName(a.model), a.state === 'running' || a.state === 'waiting' ? a.tool : ''].filter(Boolean).join(' · '),
       time: elapsed((a.endedAt ?? now) - a.startedAt),
       state: a.state,
       color: C.agent,
       details: [
+        [t().type, a.type],
         ...(a.task && a.task !== a.description ? [[t().task, a.task] as [string, string]] : []),
         [t().model, [a.model && modelName(a.model), a.effort].filter(Boolean).join(' · ') || '–'],
         [t().started, clock(a.startedAt)],
@@ -209,11 +228,11 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
     .map(s => ({
       key: `s-${s.id}`,
       title: s.title,
-      sub: s.endedAt === null ? t().shell : t().shellDone,
       time: elapsed((s.endedAt ?? now) - s.startedAt),
       state: s.endedAt === null ? 'running' : 'done',
       color: C.shell,
       details: [
+        [t().type, t().shell],
         [t().started, clock(s.startedAt)],
         [s.endedAt === null ? t().runsFor : t().duration, elapsed((s.endedAt ?? now) - s.startedAt)],
         [t().status, s.endedAt === null ? t().running : t().doneWord],
@@ -231,7 +250,7 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
       title: t().subchats,
       count: String(chats.length),
       color: C.seven_day,
-      leaves: chats.map((c, i) => ({ key: `c-${i}`, title: c.title, sub: t().ownChat, time: t().ago(span(now - c.at)), state: 'chat', color: C.seven_day, details: [[t().started, clock(c.at)]] })),
+      leaves: chats.map((c, i) => ({ key: `c-${i}`, title: c.title, time: t().ago(span(now - c.at)), state: 'chat', color: C.seven_day, details: [[t().type, t().ownChat], ...(c.model ? [[t().model, modelName(c.model)] as [string, string]] : []), [t().started, clock(c.at)]] })),
     })
   }
   return groups
@@ -241,10 +260,12 @@ type DesktopUi = Pick<Elements['desktop'], 'Box' | 'Text' | 'Svg' | 'Button'>
 
 // The changed files: from git when the session is in a repository, else the files the tools edited.
 type FileRow = GitFile & { at: number | null }
-function filesOf(env: Env | null, touches: Touch[]): FileRow[] {
+function filesOf(env: Env | null, touches: Touch[], activity: Activity[]): FileRow[] {
   const edited = new Map(touches.filter(t => t.kind === 'edit').map(t => [t.path, t.at]))
   if (env?.repo) return env.files.map(f => ({ ...f, at: edited.get(f.path) ?? [...edited].find(([p]) => p.endsWith(f.path) || f.path.endsWith(p))?.[1] ?? null }))
-  return touches.filter(t => t.kind === 'edit').map(t => ({ path: t.path, status: 'M' as const, added: 0, removed: 0, at: t.at }))
+  // Without git the lines come from the tools' own arguments, as the history counts them.
+  const lines = (path: string, key: 'added' | 'removed') => activity.filter(a => a.path === path).reduce((n, a) => n + a[key], 0)
+  return touches.filter(t => t.kind === 'edit').map(t => ({ path: t.path, status: 'M' as const, added: lines(t.path, 'added'), removed: lines(t.path, 'removed'), at: t.at }))
 }
 const dirOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
 const nameOf = (p: string) => p.slice(p.lastIndexOf('/') + 1)
@@ -330,6 +351,15 @@ function filesTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, cha
   const sum = (list: FileRow[]) => [list.reduce((n, c) => n + c.added, 0), list.reduce((n, c) => n + c.removed, 0)] as const
   const [added, removed] = sum(changed)
   const dirs = [...new Set(changed.map(c => dirOf(c.path)))].sort()
+  // The age, then one column at the right edge: the folder's sums over its files' squares.
+  const figures = (body: JSX.Element | (JSX.Element | false)[], at: number | null | undefined) => [
+    <Box key="t" width={7} justifyContent="flex-end">
+      <Text dimColor>{at != null ? span(now - at) : ''}</Text>
+    </Box>,
+    <Box key="f" width={12} flexDirection="row" columnGap={1} justifyContent="flex-end" alignItems="center">
+      {body}
+    </Box>,
+  ]
   return (
     <Box flexDirection="column" rowGap={1}>
       <Box flexDirection="row" columnGap={1}>
@@ -351,8 +381,10 @@ function filesTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, cha
                   {dir === '' ? '.' : dir}
                 </Text>
               </Box>
-              {a > 0 && <Text color={C.ok}>+{a}</Text>}
-              {d > 0 && <Text color={C.alert}>−{d}</Text>}
+              {figures(
+                [a > 0 && <Text key="a" color={C.ok}>+{a}</Text>, d > 0 && <Text key="d" color={C.alert}>−{d}</Text>],
+                undefined,
+              )}
             </Box>
             {list.map((c, i) => (
               <Box key={c.path} flexDirection="row" columnGap={1} alignItems="center">
@@ -361,10 +393,10 @@ function filesTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, cha
                 <Box flexGrow={1} flexShrink={1} minWidth={0}>
                   <Text wrap="truncate-end">{nameOf(c.path)}</Text>
                 </Box>
-                <Svg source={squaresSvg(c.added, c.removed)} alt={`+${c.added} −${c.removed}`} width={SQUARES.w} height={SQUARES.h} />
-                <Box width={7} justifyContent="flex-end">
-                  <Text dimColor>{c.at !== null ? span(now - c.at) : ''}</Text>
-                </Box>
+                {figures(
+                  <Svg source={squaresSvg(c.added, c.removed)} alt={`+${c.added} −${c.removed}`} width={SQUARES.w} height={SQUARES.h} />,
+                  c.at,
+                )}
               </Box>
             ))}
           </Box>
@@ -581,12 +613,12 @@ export function registerPane(on: On, options: PaneOptions = {}) {
     const crew = await getCrew($)
     const roster = await getRoster($)
     const touches = await getTouches($)
-    const changedFiles = filesOf(env, touches)
     const turns = await getTurns($)
     const events = await getEvents($)
     const activity = await getActivity($)
+    const changedFiles = filesOf(env, touches, activity)
     const repoOpen = await getRepoOpen($)
-    const groups = groupsOf(plan, crew, await getShells($), await getSubchats($), await getGoals($), await $.clock.now())
+    const groups = groupsOf(plan, crew, await getShells($), await getSubchats($), await getGoals($), await getBars($), await $.clock.now())
     await getTick($)
     const now = await $.clock.now()
     const since = tally.since
@@ -654,6 +686,8 @@ export function registerPane(on: On, options: PaneOptions = {}) {
       // runs. Tile and card share a hover scope, so only the tile wakes the card.
       // A card a little wider than a third, centered on its dial and pushed back inside the pane at its edges.
       const inner = Math.max(30, e.props.bodyColumns - 2)
+      // A progress bar in a task's card, at the band's 8 px a column, less the twig, the card's edges and the indent.
+      const barW = Math.max(160, (e.props.bodyColumns - 12) * 8)
       const cardW = Math.min(40, inner)
       const cardLeft = (i: number) => {
         const third = inner / dials.length
@@ -792,7 +826,8 @@ export function registerPane(on: On, options: PaneOptions = {}) {
       ]
 
       return (
-        <Box flexDirection="column" rowGap={1} paddingX={1}>
+        // Tall enough for a ring's hover card even when everything below is folded shut.
+        <Box flexDirection="column" rowGap={1} paddingX={1} minHeight={PANE_MIN_ROWS}>
           {/* Shown top down as rings, repo, tabs, but laid out the other way round: the tabs' names lie on a layer
               of their own, which would cover anything before it, so the rings and their cards come last. */}
           <Box flexDirection="column-reverse" rowGap={1}>
@@ -864,32 +899,55 @@ export function registerPane(on: On, options: PaneOptions = {}) {
                     g.leaves.map((leaf, i) => {
                       // The title is the switch: a press folds the card's details open under it.
                       const isOpen = folded.includes(`leaf-${leaf.key}`)
-                      const lines = 1 + (leaf.sub !== '' ? 1 : 0) + (isOpen ? leaf.details.length : 0)
-                      const rowH = leafHeight(lines)
+                      const linked = isOpen ? (leaf.bars ?? []) : []
+                      // A drawn bar takes three lines: a gap, its name and count, then the track.
+                      const rowH = leafHeight(1 + (isOpen ? leaf.details.length : 0) + linked.length * 3)
                       return (
                         <Box key={leaf.key} flexDirection="row" alignItems="center">
                           <Svg source={twigSvg(i === g.leaves.length - 1, g.color, rowH)} alt={t().branch} width={TWIG.w} height={rowH} />
-                          <Box flexDirection="row" flexGrow={1} flexShrink={1} columnGap={1} alignItems="flex-start" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
-                            <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.state} width={RING} height={RING} />
-                            <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
-                              <Box flexDirection="row" columnGap={1}>
-                                <Box flexShrink={1} minWidth={0}>
-                                  <Button key={`leaf-${leaf.key}`} plain onPress={() => void toggleFold($, `leaf-${leaf.key}`)}>
-                                    <Text dimColor={leaf.state === 'done' || leaf.state === 'pending'} wrap="truncate-end">
-                                      {leaf.title}
-                                    </Text>
-                                  </Button>
-                                </Box>
-                                <Box flexGrow={1} />
-                                <Text dimColor>{leaf.time}</Text>
+                          <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+                            {/* Ring, title and time on one centred line; the details under it start where the title does. */}
+                            <Box flexDirection="row" columnGap={1} alignItems="center">
+                              <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.state} width={LEAF_RING} height={LEAF_RING} />
+                              <Box flexShrink={1} minWidth={0}>
+                                <Button key={`leaf-${leaf.key}`} plain onPress={() => void toggleFold($, `leaf-${leaf.key}`)}>
+                                  <Text dimColor={leaf.state === 'done' || leaf.state === 'pending'} wrap="truncate-end">
+                                    {leaf.title}
+                                  </Text>
+                                </Button>
                               </Box>
-                              {leaf.sub !== '' && (
-                                <Text dimColor wrap="truncate-end">
-                                  {leaf.sub}
-                                </Text>
-                              )}
-                              {isOpen && leaf.details.map(([name, value]) => <Fact key={name} Box={Box} Text={Text} name={name} value={value} />)}
+                              <Box flexGrow={1} />
+                              <Text dimColor>{leaf.time}</Text>
                             </Box>
+                            {isOpen && (
+                              // A blank as wide as the ring, the same gap, and the cell the button draws its label in.
+                              <Box flexDirection="row" columnGap={1}>
+                                <Svg source={LEAF_BLANK} alt="" width={LEAF_RING} height={1} />
+                                <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0} paddingLeft={1}>
+                                  {leaf.details.map(([name, value], j) => (
+                                    <Fact key={`${name}-${j}`} Box={Box} Text={Text} name={name} value={value} />
+                                  ))}
+                                  {/* Each progress bar of the step drawn as the band draws it; a finished one stays, full. */}
+                                  {linked.map(b => {
+                                    const bar = toolBar(b, `pane:${b.id}`)
+                                    const at = b.steps.findIndex(s => s.status === 'in_progress')
+                                    const place = at >= 0 ? at + 1 : b.steps.filter(s => s.status === 'completed').length
+                                    return (
+                                      <Box key={b.id} flexDirection="column" marginTop={1}>
+                                        <Box flexDirection="row">
+                                          <Text>{b.title}</Text>
+                                          <Box flexGrow={1} />
+                                          <Text dimColor>
+                                            {place}/{b.steps.length}
+                                          </Text>
+                                        </Box>
+                                        <Svg source={liveSource(trackSvg(bar, barW, now).base, now)} alt={b.title} width={barW} height={TRACK_H} />
+                                      </Box>
+                                    )
+                                  })}
+                                </Box>
+                              </Box>
+                            )}
                           </Box>
                         </Box>
                       )
