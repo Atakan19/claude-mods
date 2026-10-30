@@ -159,15 +159,8 @@ export const weatherSvg = (percent: number, size = 16) => {
 // The bar under the open tab; the others draw it empty, so every tab keeps one height.
 export const tabBarSvg = (color: string) => svg(28, 3, color === 'none' ? '' : `<rect width="28" height="3" rx="1.5" fill="${color}"/>`)
 
-// A small count beside a tab's name: what runs there.
-export const BADGE_H = 16
-export const badgeWidth = (text: string) => 10 + text.length * 7
-export const badgeSvg = (text: string, color: string) => {
-  const w = badgeWidth(text)
-  return svg(
-    w,
-    BADGE_H,
-    `<rect width="${w}" height="${BADGE_H}" rx="${BADGE_H / 2}" fill="${color}" fill-opacity=".22"/>` +
-      `<text x="${w / 2}" y="12" text-anchor="middle" fill="${color}" font-size="11" font-weight="600" font-family="Segoe UI, system-ui, sans-serif">${esc(text)}</text>`,
-  )
-}
+// A small raised number at a tab's name, as an exponent: what runs or waits there.
+export const SUP_H = 12
+export const supWidth = (text: string) => 4 + text.length * 7
+export const supSvg = (text: string, color: string) =>
+  svg(supWidth(text), SUP_H, `<text x="1" y="10" fill="${color}" font-size="11" font-weight="700" font-family="Segoe UI, system-ui, sans-serif">${esc(text)}</text>`)

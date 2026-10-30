@@ -3,7 +3,7 @@ import type { EngineInterface, On } from 'claude-code'
 import type { AgentRow, Env, Limit, Live, Plan, Shell, Subchat } from '../types'
 import { bar, clock, elapsedOf, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
-import { BADGE_H, BEAD, C, badgeSvg, badgeWidth, beadsWidth, tabBarSvg, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
+import { BEAD, C, SUP_H, beadsWidth, supSvg, supWidth, tabBarSvg, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
 import { elapsed } from './progress'
 import { PANE, getRunning, getCrew, getEnv, getFolded, getLive, getPlan, getShells, getSubchats, getTab, getTally, getTick, setTab, toggleFold } from './state'
 
@@ -58,9 +58,7 @@ function limitWarning(l: Limit, now: number) {
 function repoLine(env: Env) {
   const drift = [env.ahead > 0 && `↑${env.ahead}`, env.behind > 0 && `↓${env.behind}`].filter(Boolean).join(' ')
   const lines = [env.added > 0 && `+${env.added}`, env.removed > 0 && `−${env.removed}`].filter(Boolean).join(' ')
-  return [env.branch && `⑂ ${env.branch}`, drift && env.branch !== env.base && `${drift} gegen ${env.base}`, env.changed > 0 && `● ${env.changed} geändert`, lines]
-    .filter(Boolean)
-    .join('  ')
+  return [env.branch && `⑂ ${env.branch}`, drift && env.branch !== env.base && `${drift} gegen ${env.base}`, env.changed > 0 && `● ${env.changed} geändert`, lines].filter(Boolean).join('  ')
 }
 
 const tallyLine = (t: { turns: number; tools: number }) => `${t.turns} Turns · ${t.tools} Tools`
@@ -142,6 +140,7 @@ export function registerPane(on: On) {
     const plan = await getPlan($)
     const crew = await getCrew($)
     const liveAgents = crew.filter(a => a.state === 'running' || a.state === 'waiting').length
+    const openSteps = plan ? plan.steps.filter(s => s.status !== 'completed').length : 0
     const groups = groupsOf(plan, crew, await getShells($), await getSubchats($), await $.clock.now())
     await getTick($)
     const now = await $.clock.now()
@@ -151,37 +150,57 @@ export function registerPane(on: On) {
       const { Box, Text, Svg, Button } = $.ui.resolve(e)
       if (!l) return <Text dimColor>Wartet auf die erste Antwort…</Text>
       // A segment switch across the width: the open tab lifts out of the track.
-      // A rounded track like the cards; the open tab is bright with a bar under it, a badge says what runs there.
+      // Plain tabs over a thin line; the open one is bright with a bar under it, a small raised number says what runs there.
       const badges: Record<string, { text: string; color: string } | null> = {
         agents: liveAgents > 0 ? { text: String(liveAgents), color: C.agent } : null,
-        plan: plan && plan.steps.length > 0 ? { text: `${plan.steps.filter(s => s.status === 'completed').length}/${plan.steps.length}`, color: C.chat } : null,
+        plan: openSteps > 0 ? { text: String(openSteps), color: C.chat } : null,
       }
       const tabs = (
-        <Box flexDirection="row" backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
-          {TABS.map(t => {
-            const badge = badges[t.key] ?? null
-            return (
-              <Box key={t.key} flexGrow={1} width="25%" flexDirection="column" alignItems="center" hover={{ backgroundColor: C.card }}>
-                <Box flexDirection="row" columnGap={1} alignItems="center">
-                  {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
-                  {badge && <Svg source={badgeSvg(badge.text, badge.color)} alt={badge.text} width={badgeWidth(badge.text)} height={BADGE_H} />}
+        <Box flexDirection="column">
+          <Box flexDirection="row">
+            {TABS.map(t => {
+              const badge = badges[t.key] ?? null
+              return (
+                <Box key={t.key} flexGrow={1} width="25%" flexDirection="column" alignItems="center">
+                  <Box flexDirection="row" alignItems="flex-start">
+                    {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
+                    {badge && <Svg source={supSvg(badge.text, badge.color)} alt={badge.text} width={supWidth(badge.text)} height={SUP_H} />}
+                  </Box>
+                  <Svg source={tabBarSvg(t.key === tab ? C.chat : 'none')} alt={t.key === tab ? 'offen' : 'Tab'} width={28} height={3} />
                 </Box>
-                <Svg source={tabBarSvg(t.key === tab ? C.chat : 'none')} alt={t.key === tab ? 'offen' : 'Tab'} width={28} height={3} />
-              </Box>
-            )
-          })}
+              )
+            })}
+          </Box>
+          {/* One thin line under the row, the open tab's bar sits on it. */}
+          <Svg
+            source={`<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1" viewBox="0 0 1000 1" preserveAspectRatio="none"><rect width="1000" height="1" fill="${C.line}"/></svg>`}
+            alt="Linie"
+          />
         </Box>
       )
       const five = l.limits.find(lim => lim.kind === 'five_hour')
       const seven = l.limits.find(lim => lim.kind === 'seven_day')
       const w = weatherOf(l.ctxPercent)
-      type Dial = { key: string; percent: number; color: string; value: string; label: string; sub: string; pace: number | null; warning: { text: string; color: string } | null; facts: [string, string][] }
+      type Dial = {
+        key: string
+        percent: number
+        color: string
+        value: string
+        label: string
+        sub: string
+        pace: number | null
+        warning: { text: string; color: string } | null
+        facts: [string, string][]
+      }
       // Hovered, a dial lights and a card with its details opens under it; the surface draws both, no hook runs.
       const dial = (d: Dial, side: 'left' | 'middle' | 'right') => (
-        <Box key={d.key} flexDirection="column" alignItems="center" width={DIAL.w + 14} hover={{ backgroundColor: C.card }}>
-          <Svg source={dialSvg(d.percent, d.color, d.value, d.label, d.pace)} alt={`${d.label} ${d.value}`} width={DIAL.w} height={DIAL.h} />
-          {d.sub !== '' && <Text dimColor>{d.sub}</Text>}
-          {d.warning && <Text color={d.warning.color}>{d.warning.text}</Text>}
+        <Box key={d.key} flexDirection="column" alignItems="center" width={DIAL.w + 14}>
+          {/* Hovered, only a small rounded tile around the ring lights, not the whole third. */}
+          <Box flexDirection="column" alignItems="center" paddingX={1} borderStyle="round" borderColor="transparent" hover={{ backgroundColor: C.card, borderColor: C.card }}>
+            <Svg source={dialSvg(d.percent, d.color, d.value, d.label, d.pace)} alt={`${d.label} ${d.value}`} width={DIAL.w} height={DIAL.h} />
+            {d.sub !== '' && <Text dimColor>{d.sub}</Text>}
+            {d.warning && <Text color={d.warning.color}>{d.warning.text}</Text>}
+          </Box>
           <Box
             position="absolute"
             top={6}
@@ -283,49 +302,49 @@ export function registerPane(on: On) {
 
           {tab !== 'session' && <Text dimColor>Kommt bald.</Text>}
           {tab === 'session' && (
-          <Box flexDirection="column" rowGap={1}>
-            <Box flexDirection="row" columnGap={1} alignItems="center">
-              <Svg source={coreSvg('#ececec')} alt="Diese Session" width={18} height={18} />
-              <Text bold>Diese Session</Text>
-              <Box flexGrow={1} />
-              <Text dimColor>
-                {tallyLine(tally)}
-                {since !== null && ` · ${elapsed(now - since)}`}
-              </Text>
-            </Box>
-            {groups.length === 0 && <Text dimColor>Nichts läuft nebenher.</Text>}
-            {/* Each group runs on a line of its own: a dot at its name, a twig into each card. */}
-            {groups.map(g => (
-              <Box key={g.key} flexDirection="column">
-                <Box flexDirection="row" columnGap={1} alignItems="center">
-                  <Svg source={headSvg(g.color, !folded.includes(g.key))} alt={g.title} width={folded.includes(g.key) ? TWIG.dot : TWIG.w} height={TWIG.head} />
-                  <Button plain dimColor label={`${folded.includes(g.key) ? '▸' : '▾'} ${g.title}`} onPress={() => void toggleFold($, g.key)} />
-                  {folded.includes(g.key) && <Svg source={beadsSvg(g.leaves)} alt={g.current ?? g.count} width={beadsWidth(g.leaves.length)} height={BEAD} />}
-                  <Box flexGrow={1} />
-                  <Text dimColor>{g.count}</Text>
-                </Box>
-                {!folded.includes(g.key) &&
-                  g.leaves.map((leaf, i) => (
-                    <Box key={leaf.key} flexDirection="row" alignItems="center">
-                      <Svg source={twigSvg(i === g.leaves.length - 1, g.color)} alt="Zweig" width={TWIG.w} height={TWIG.leaf} />
-                      <Box flexDirection="row" flexGrow={1} flexShrink={1} columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
-                        <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.sub} width={RING} height={RING} />
-                        <Box flexDirection="column" flexShrink={1}>
-                          <Text dimColor={leaf.state === 'done' || leaf.state === 'pending'} wrap="truncate-end">
-                            {leaf.title}
-                          </Text>
-                          <Text dimColor wrap="truncate-end">
-                            {leaf.sub}
-                          </Text>
-                        </Box>
-                        <Box flexGrow={1} />
-                        <Text dimColor>{leaf.time}</Text>
-                      </Box>
-                    </Box>
-                  ))}
+            <Box flexDirection="column" rowGap={1}>
+              <Box flexDirection="row" columnGap={1} alignItems="center">
+                <Svg source={coreSvg('#ececec')} alt="Diese Session" width={18} height={18} />
+                <Text bold>Diese Session</Text>
+                <Box flexGrow={1} />
+                <Text dimColor>
+                  {tallyLine(tally)}
+                  {since !== null && ` · ${elapsed(now - since)}`}
+                </Text>
               </Box>
-            ))}
-          </Box>
+              {groups.length === 0 && <Text dimColor>Nichts läuft nebenher.</Text>}
+              {/* Each group runs on a line of its own: a dot at its name, a twig into each card. */}
+              {groups.map(g => (
+                <Box key={g.key} flexDirection="column">
+                  <Box flexDirection="row" columnGap={1} alignItems="center">
+                    <Svg source={headSvg(g.color, !folded.includes(g.key))} alt={g.title} width={folded.includes(g.key) ? TWIG.dot : TWIG.w} height={TWIG.head} />
+                    <Button plain dimColor label={`${folded.includes(g.key) ? '▸' : '▾'} ${g.title}`} onPress={() => void toggleFold($, g.key)} />
+                    {folded.includes(g.key) && <Svg source={beadsSvg(g.leaves)} alt={g.current ?? g.count} width={beadsWidth(g.leaves.length)} height={BEAD} />}
+                    <Box flexGrow={1} />
+                    <Text dimColor>{g.count}</Text>
+                  </Box>
+                  {!folded.includes(g.key) &&
+                    g.leaves.map((leaf, i) => (
+                      <Box key={leaf.key} flexDirection="row" alignItems="center">
+                        <Svg source={twigSvg(i === g.leaves.length - 1, g.color)} alt="Zweig" width={TWIG.w} height={TWIG.leaf} />
+                        <Box flexDirection="row" flexGrow={1} flexShrink={1} columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+                          <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.sub} width={RING} height={RING} />
+                          <Box flexDirection="column" flexShrink={1}>
+                            <Text dimColor={leaf.state === 'done' || leaf.state === 'pending'} wrap="truncate-end">
+                              {leaf.title}
+                            </Text>
+                            <Text dimColor wrap="truncate-end">
+                              {leaf.sub}
+                            </Text>
+                          </Box>
+                          <Box flexGrow={1} />
+                          <Text dimColor>{leaf.time}</Text>
+                        </Box>
+                      </Box>
+                    ))}
+                </Box>
+              ))}
+            </Box>
           )}
         </Box>
       )
@@ -372,7 +391,10 @@ export function registerPane(on: On) {
           {leaves.map(({ g, leaf }, i) => (
             <Text key={leaf.key} dimColor={leaf.state === 'done' || leaf.state === 'pending'}>
               {i === leaves.length - 1 ? '└─ ' : '├─ '}
-              {leaf.state === 'done' ? '✓' : leaf.state === 'error' ? '✕' : leaf.state === 'chat' ? '◇' : leaf.state === 'pending' ? '○' : '●'} {leaf.title} <Text dimColor>· {g.title} · {leaf.time}</Text>
+              {leaf.state === 'done' ? '✓' : leaf.state === 'error' ? '✕' : leaf.state === 'chat' ? '◇' : leaf.state === 'pending' ? '○' : '●'} {leaf.title}{' '}
+              <Text dimColor>
+                · {g.title} · {leaf.time}
+              </Text>
             </Text>
           ))}
         </Box>
