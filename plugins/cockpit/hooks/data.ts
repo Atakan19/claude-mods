@@ -50,7 +50,8 @@ async function readEnv($: EngineInterface): Promise<Env> {
   let main = await git($, cwd, ['rev-parse', '--abbrev-ref', 'origin/HEAD'])
   for (const name of ['origin/main', 'main', 'master']) if (!main && (await git($, cwd, ['rev-parse', '--verify', '--quiet', name]))) main = name
   const [behind, ahead] = (await git($, cwd, ['rev-list', '--left-right', '--count', `${main}...HEAD`])).split(/\s+/).map(Number)
-  const status = await git($, cwd, ['status', '--porcelain'])
+  // -uall: a new folder's files one by one, not the folder as one entry
+  const status = await git($, cwd, ['status', '--porcelain', '--untracked-files=all'])
   // "3 files changed, 120 insertions(+), 40 deletions(-)"
   const stat = await git($, cwd, ['diff', '--shortstat', 'HEAD'])
   const numstat = await git($, cwd, ['diff', '--numstat', 'HEAD'])

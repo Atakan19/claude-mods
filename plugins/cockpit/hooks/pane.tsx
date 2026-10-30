@@ -58,7 +58,12 @@ import {
 // Finished work stays on its branch this long, pale, then leaves the tree.
 const KEEP_MS = 3 * 60e3
 // Session first; the others hold a place until their content is settled.
-const TABS = ['session', 'agents', 'files'].map(key => ({ key, get label() { return t().tabs[key]! } }))
+const TABS = ['session', 'agents', 'files'].map(key => ({
+  key,
+  get label() {
+    return t().tabs[key]!
+  },
+}))
 const GOAL = '#e0a030'
 const roleName = (role: Role) => t().roles[role]!
 const MOOD = {
@@ -101,13 +106,7 @@ function resetText(l: Limit, now: number) {
 // Past half the window a fresh chat is the cheaper way on; the ring marks that line.
 const NEW_CHAT_AT = 50
 function ctxWarning(percent: number) {
-  return percent >= 90
-    ? { text: t().compactNow, color: C.alert }
-    : percent >= 75
-      ? { text: t().fullSoon, color: C.warn }
-      : percent >= NEW_CHAT_AT
-        ? { text: t().newChat, color: C.warn }
-        : null
+  return percent >= 90 ? { text: t().compactNow, color: C.alert } : percent >= 75 ? { text: t().fullSoon, color: C.warn } : percent >= NEW_CHAT_AT ? { text: t().newChat, color: C.warn } : null
 }
 function limitWarning(l: Limit, now: number) {
   const tone = paceOf(l, now)
@@ -118,7 +117,9 @@ function limitWarning(l: Limit, now: number) {
 function repoLine(env: Env) {
   const drift = [env.ahead > 0 && `↑${env.ahead}`, env.behind > 0 && `↓${env.behind}`].filter(Boolean).join(' ')
   const lines = [env.added > 0 && `+${env.added}`, env.removed > 0 && `−${env.removed}`].filter(Boolean).join(' ')
-  return [env.branch && `⑂ ${env.branch}`, drift && env.branch !== env.base && `${drift} ${t().against(env.base)}`, env.changed > 0 && `● ${t().changedCount(env.changed)}`, lines].filter(Boolean).join('  ')
+  return [env.branch && `⑂ ${env.branch}`, drift && env.branch !== env.base && `${drift} ${t().against(env.base)}`, env.changed > 0 && `● ${t().changedCount(env.changed)}`, lines]
+    .filter(Boolean)
+    .join('  ')
 }
 
 const tallyLine = (n: { turns: number; tools: number }) => `${t().turns(n.turns)} · ${t().tools(n.tools)}`
@@ -253,15 +254,18 @@ function agentsTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, ro
               <Button key={`agent-${a.id}`} plain onPress={() => void toggleFold($, `agent-${a.id}`)}>
                 <Text bold>{a.description}</Text> <Text dimColor>{folded.includes(`agent-${a.id}`) ? '▴' : '▾'}</Text>
               </Button>
-              {a.task && a.task !== a.description && (
+              {/* A button draws its label a cell in; the lines under it step in as far, so all start in line. */}
+              <Box flexDirection="column" paddingLeft={1}>
+                {a.task && a.task !== a.description && (
+                  <Text dimColor wrap="truncate-end">
+                    {a.task}
+                  </Text>
+                )}
                 <Text dimColor wrap="truncate-end">
-                  {a.task}
+                  {[role === 'plain' ? a.type : roleName(role), a.model && modelName(a.model), elapsed((a.endedAt ?? now) - a.startedAt), t().tools(a.tools ?? 0)].filter(Boolean).join(' · ')}
+                  {a.state !== 'done' && a.tool !== '' && <Text color={a.state === 'waiting' ? C.warn : a.state === 'error' ? C.alert : undefined}> · {a.tool}</Text>}
                 </Text>
-              )}
-              <Text dimColor wrap="truncate-end">
-                {[role === 'plain' ? a.type : roleName(role), a.model && modelName(a.model), elapsed((a.endedAt ?? now) - a.startedAt), t().tools(a.tools ?? 0)].filter(Boolean).join(' · ')}
-                {a.state !== 'done' && a.tool !== '' && <Text color={a.state === 'waiting' ? C.warn : a.state === 'error' ? C.alert : undefined}> · {a.tool}</Text>}
-              </Text>
+              </Box>
               {folded.includes(`agent-${a.id}`) && (
                 <Box flexDirection="column" marginTop={1}>
                   <Fact Box={Box} Text={Text} name={t().type} value={a.type} />
@@ -485,7 +489,10 @@ export function registerPane(on: On, options: PaneOptions = {}) {
           .slice(-15)
           .map((turn, i) => (
             <Text key={`${turn.at}-${i}`}>
-              <Text dimColor>{clock(turn.at)}</Text> {promptLine(turn.prompt)} <Text dimColor>· {elapsed(turn.seconds * 1000)} · {t().tools(turn.tools)}</Text>
+              <Text dimColor>{clock(turn.at)}</Text> {promptLine(turn.prompt)}{' '}
+              <Text dimColor>
+                · {elapsed(turn.seconds * 1000)} · {t().tools(turn.tools)}
+              </Text>
             </Text>
           ))}
       </Box>
@@ -628,7 +635,7 @@ export function registerPane(on: On, options: PaneOptions = {}) {
           </Box>
         </Box>
       )
-            const limitDial = (lim: Limit, label: string, calm: string): Dial => {
+      const limitDial = (lim: Limit, label: string, calm: string): Dial => {
         const gone = elapsedOf(lim, now)
         const at = lim.resetsAt ? Date.parse(lim.resetsAt) : null
         return {
@@ -684,7 +691,9 @@ export function registerPane(on: On, options: PaneOptions = {}) {
           {env.isGithub && (
             <Box flexDirection="row" columnGap={2} marginTop={1}>
               <Link href={`https://github.com/${env.repo}/tree/${encodeURIComponent(env.branch || env.base)}`}>{t().openOnGithub}</Link>
-              {env.branch !== '' && env.branch !== env.base && <Link href={`https://github.com/${env.repo}/compare/${encodeURIComponent(env.base)}...${encodeURIComponent(env.branch)}`}>{t().compare(env.base)}</Link>}
+              {env.branch !== '' && env.branch !== env.base && (
+                <Link href={`https://github.com/${env.repo}/compare/${encodeURIComponent(env.base)}...${encodeURIComponent(env.branch)}`}>{t().compare(env.base)}</Link>
+              )}
             </Box>
           )}
         </Box>
@@ -763,7 +772,17 @@ export function registerPane(on: On, options: PaneOptions = {}) {
                 {SHOW.history && <Button key="open-history" plain dimColor label="🕘" onPress={() => void toggleFold($, 'history-pop')} />}
                 {/* The 🕘 folds a small card open under it: the last turns, and the way to the whole history. */}
                 {SHOW.history && folded.includes('history-pop') && (
-                  <Box position="absolute" top={2} right={0} width={Math.min(44, e.props.bodyColumns - 2)} flexDirection="column" paddingX={1} backgroundColor={C.popup} borderStyle="round" borderColor={C.line}>
+                  <Box
+                    position="absolute"
+                    top={2}
+                    right={0}
+                    width={Math.min(44, e.props.bodyColumns - 2)}
+                    flexDirection="column"
+                    paddingX={1}
+                    backgroundColor={C.popup}
+                    borderStyle="round"
+                    borderColor={C.line}
+                  >
                     <Text bold>{t().historyTitle}</Text>
                     {foldAppTurns(turns).length === 0 && <Text dimColor>{t().noHistory}</Text>}
                     {foldAppTurns(turns)
