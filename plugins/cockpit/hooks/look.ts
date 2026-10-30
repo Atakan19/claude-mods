@@ -88,12 +88,12 @@ export function ringSvg(state: RingState, color: string) {
 
 // The tree, one line per group in its color. The drawings fix each row's height, so the line runs through.
 // leaf is a little taller than a card (about 64 px), so cards keep a gap while the line runs through.
-export const TWIG = { w: 26, dot: 14, x: 9, head: 32, leaf: 74 }
+export const TWIG = { w: 26, x: 9, head: 32, leaf: 74 }
 const stroke = (color: string) => `fill="none" stroke="${color}" stroke-opacity=".55" stroke-width="1.5"`
 // The group's head: a dot; open, its line starts under it.
 export const headSvg = (color: string, isOpen: boolean) =>
   svg(
-    isOpen ? TWIG.w : TWIG.dot,
+    TWIG.w,
     TWIG.head,
     `<circle cx="${TWIG.x}" cy="${TWIG.head / 2}" r="4" fill="${color}"/>` + (isOpen ? `<path d="M${TWIG.x} ${TWIG.head / 2 + 4}V${TWIG.head}" ${stroke(color)}/>` : ''),
   )

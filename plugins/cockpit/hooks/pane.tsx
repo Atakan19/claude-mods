@@ -847,7 +847,7 @@ export function registerPane(on: On, options: PaneOptions = {}) {
               {groups.map(g => (
                 <Box key={g.key} flexDirection="column">
                   <Box flexDirection="row" columnGap={1} alignItems="center">
-                    <Svg source={headSvg(g.color, !folded.includes(g.key))} alt={g.title} width={folded.includes(g.key) ? TWIG.dot : TWIG.w} height={TWIG.head} />
+                    <Svg source={headSvg(g.color, !folded.includes(g.key))} alt={g.title} width={TWIG.w} height={TWIG.head} />
                     <Button plain dimColor label={`${folded.includes(g.key) ? '▸' : '▾'} ${g.title}`} onPress={() => void toggleFold($, g.key)} />
                     {folded.includes(g.key) && <Svg source={beadsSvg(g.leaves)} alt={g.current ?? g.count} width={beadsWidth(g.leaves.length)} height={BEAD} />}
                     <Box flexGrow={1} />
