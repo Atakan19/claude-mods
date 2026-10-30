@@ -61,7 +61,7 @@ function repoLine(env: Env) {
   return [env.branch && `⑂ ${env.branch}`, drift && env.branch !== env.base && `${drift} gegen ${env.base}`, env.changed > 0 && `● ${env.changed} geändert`, lines].filter(Boolean).join('  ')
 }
 
-const tallyLine = (t: { turns: number; tools: number }) => `${t.turns} Turns · ${t.tools} Tools`
+const tallyLine = (t: { turns: number; tools: number }) => `${t.turns} ${t.turns === 1 ? 'Turn' : 'Turns'} · ${t.tools} ${t.tools === 1 ? 'Tool' : 'Tools'}`
 
 // What hangs off the session: the task list, the background work, the chats it started.
 function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: Subchat[], now: number): Group[] {
@@ -78,7 +78,7 @@ function groupsOf(plan: Plan | null, crew: AgentRow[], shells: Shell[], chats: S
         key: `p-${s.id}`,
         title: s.title,
         sub: s.status === 'completed' ? 'fertig' : s.status === 'in_progress' ? 'läuft' : 'offen',
-        time: s.startedAt ? elapsed((s.endedAt ?? now) - s.startedAt) : '',
+        time: s.startedAt && (s.endedAt ?? now) - s.startedAt >= 1000 ? elapsed((s.endedAt ?? now) - s.startedAt) : '',
         state: s.status === 'completed' ? 'done' : s.status === 'in_progress' ? 'running' : 'pending',
         color: C.chat,
       })),
@@ -155,26 +155,16 @@ export function registerPane(on: On) {
         agents: liveAgents > 0 ? { text: String(liveAgents), color: C.agent } : null,
         plan: openSteps > 0 ? { text: String(openSteps), color: C.chat } : null,
       }
-      // A toggle: a rounded track, the open tab a lifted pill in it. Every tab draws the same invisible
-      // border, so all keep one height; the button stretches over its whole tab, so a hover lights all of it.
-      // The count sits raised past the name's end, outside its box, so it leaves the name centered.
+      // A toggle: a rounded track, the open tab a filled pill in it. The surface draws its own pill around a
+      // hovered button's name and cannot be made wider, so the open tab takes that same shape (a secondary button).
       const tabs = (
         <Box flexDirection="row" backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
           {TABS.map(t => {
             const badge = badges[t.key] ?? null
-            const isOpen = t.key === tab
             return (
-              <Box key={t.key} flexGrow={1} width="25%" flexDirection="column" alignItems="stretch" backgroundColor={isOpen ? C.segment : undefined} borderStyle="round" borderColor={isOpen ? C.segment : C.clear}>
-                <Box flexDirection="row" justifyContent="center">
-                  <Box>
-                    {isOpen ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
-                    {badge && (
-                      <Box position="absolute" top={0} right={-(Math.ceil(supWidth(badge.text) / 8) + 1)}>
-                        <Svg source={supSvg(badge.text, badge.color)} alt={badge.text} width={supWidth(badge.text)} height={SUP_H} />
-                      </Box>
-                    )}
-                  </Box>
-                </Box>
+              <Box key={t.key} flexGrow={1} width="25%" flexDirection="row" justifyContent="center" alignItems="flex-start">
+                {t.key === tab ? <Button variant="secondary" label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
+                {badge && <Svg source={supSvg(badge.text, badge.color)} alt={badge.text} width={supWidth(badge.text)} height={SUP_H} />}
               </Box>
             )
           })}
