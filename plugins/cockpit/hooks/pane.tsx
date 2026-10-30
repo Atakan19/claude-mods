@@ -158,7 +158,17 @@ export function registerPane(on: On) {
       // A toggle: the track and the open tab's pill are one drawing, the names lie over it.
       const tabs = (
         <Box flexDirection="column">
-          <Svg source={toggleSvg(Math.max(0, TABS.findIndex(t => t.key === tab)), TABS.length)} alt="Tabs" height={TOGGLE_H} />
+          <Svg
+            source={toggleSvg(
+              Math.max(
+                0,
+                TABS.findIndex(t => t.key === tab),
+              ),
+              TABS.length,
+            )}
+            alt="Tabs"
+            height={TOGGLE_H}
+          />
           <Box position="absolute" top={0} bottom={0} left={0} right={0} flexDirection="row" alignItems="center">
             {TABS.map(t => {
               const badge = badges[t.key] ?? null
@@ -187,19 +197,20 @@ export function registerPane(on: On) {
         facts: [string, string][]
       }
       // Hovered, a dial lights and a card with its details opens under it; the surface draws both, no hook runs.
-      const dial = (d: Dial, side: 'left' | 'middle' | 'right') => (
+      const dial = (d: Dial) => (
         <Box key={d.key} flexDirection="column" alignItems="center" width={DIAL.w + 14}>
           {/* Hovered, only a small rounded tile around the ring lights, not the whole third. */}
-          <Box flexDirection="column" alignItems="center" paddingX={1} borderStyle="round" borderColor={C.clear} hover={{ backgroundColor: C.card, borderColor: C.card }}>
+          <Box flexDirection="column" alignItems="center" paddingX={2} borderStyle="round" borderColor={C.clear} hover={{ backgroundColor: C.card, borderColor: C.card }}>
             <Svg source={dialSvg(d.percent, d.color, d.value, d.label, d.pace)} alt={`${d.label} ${d.value}`} width={DIAL.w} height={DIAL.h} />
             {d.sub !== '' && <Text dimColor>{d.sub}</Text>}
             {d.warning && <Text color={d.warning.color}>{d.warning.text}</Text>}
           </Box>
           <Box
             position="absolute"
-            top={6}
-            // Flush with the pane's left or right edge; the middle one reaches equally past both sides of its dial.
-            {...(side === 'left' ? { left: 0, width: 28 } : side === 'right' ? { right: 0, width: 28 } : { left: -4, right: -4 })}
+            // A row under the tile, centered on its dial: it reaches one cell past each side, no further than the pane's padding.
+            top={7}
+            left={-1}
+            right={-1}
             display="none"
             hover={{ display: 'flex' }}
             flexDirection="column"
@@ -220,54 +231,48 @@ export function registerPane(on: On) {
         </Box>
       )
       const PACE = { calm: 'ruhig', fast: 'zu schnell', alert: 'kritisch' } as const
-      const limitDial = (lim: Limit, label: string, calm: string, side: 'middle' | 'right') => {
+      const limitDial = (lim: Limit, label: string, calm: string) => {
         const gone = elapsedOf(lim, now)
         const at = lim.resetsAt ? Date.parse(lim.resetsAt) : null
-        return dial(
-          {
-            key: lim.kind,
-            percent: lim.percentUsed,
-            color: toned(paceOf(lim, now), calm),
-            value: `${Math.round(lim.percentUsed)}%`,
-            label,
-            sub: resetText(lim, now),
-            pace: gone,
-            warning: limitWarning(lim, now),
-            facts: [
-              ['Verbraucht', `${Math.round(lim.percentUsed)} %`],
-              ...(gone !== null ? [[lim.kind === 'five_hour' ? 'Fenster vorbei' : 'Woche vorbei', `${Math.round(gone)} %`] as [string, string]] : []),
-              ['Tempo', PACE[paceOf(lim, now)]],
-              ...(at !== null ? [['Reset', `${resetText(lim, now).replace('↻ ', '')} · in ${span(at - now)}`] as [string, string]] : []),
-            ],
-          },
-          side,
-        )
+        return dial({
+          key: lim.kind,
+          percent: lim.percentUsed,
+          color: toned(paceOf(lim, now), calm),
+          value: `${Math.round(lim.percentUsed)}%`,
+          label,
+          sub: resetText(lim, now),
+          pace: gone,
+          warning: limitWarning(lim, now),
+          facts: [
+            ['Verbraucht', `${Math.round(lim.percentUsed)} %`],
+            ...(gone !== null ? [[lim.kind === 'five_hour' ? 'Fenster vorbei' : 'Woche vorbei', `${Math.round(gone)} %`] as [string, string]] : []),
+            ['Tempo', PACE[paceOf(lim, now)]],
+            ...(at !== null ? [['Reset', `${resetText(lim, now).replace('↻ ', '')} · in ${span(at - now)}`] as [string, string]] : []),
+          ],
+        })
       }
 
       return (
         <Box flexDirection="column" rowGap={1} paddingX={1}>
           <Box flexDirection="row">
-            {dial(
-              {
-                key: 'ctx',
-                percent: l.ctxPercent,
-                color: l.ctxPercent >= 90 ? C.alert : l.ctxPercent >= 75 ? C.warn : C.context,
-                value: l.ctxTokens > 0 ? k(l.ctxTokens) : '–',
-                label: 'Context',
-                sub: l.ctxTokens > 0 ? `${w.glyph} ${w.word}` : 'misst…',
-                pace: null,
-                warning: ctxWarning(l.ctxPercent),
-                facts: [
-                  ['Belegt', `${k(l.ctxTokens)} von ${k(l.ctxWindow)}`],
-                  ['Anteil', `${Math.round(l.ctxPercent)} %`],
-                  ['Frei', k(Math.max(0, l.ctxWindow - l.ctxTokens))],
-                  ['Wetter', `${w.glyph} ${w.word}`],
-                ],
-              },
-              'left',
-            )}
-            {five && limitDial(five, '5h', C.five_hour, 'middle')}
-            {seven && limitDial(seven, '7d', C.seven_day, 'right')}
+            {dial({
+              key: 'ctx',
+              percent: l.ctxPercent,
+              color: l.ctxPercent >= 90 ? C.alert : l.ctxPercent >= 75 ? C.warn : C.context,
+              value: l.ctxTokens > 0 ? k(l.ctxTokens) : '–',
+              label: 'Context',
+              sub: l.ctxTokens > 0 ? `${w.glyph} ${w.word}` : 'misst…',
+              pace: null,
+              warning: ctxWarning(l.ctxPercent),
+              facts: [
+                ['Belegt', `${k(l.ctxTokens)} von ${k(l.ctxWindow)}`],
+                ['Anteil', `${Math.round(l.ctxPercent)} %`],
+                ['Frei', k(Math.max(0, l.ctxWindow - l.ctxTokens))],
+                ['Wetter', `${w.glyph} ${w.word}`],
+              ],
+            })}
+            {five && limitDial(five, '5h', C.five_hour)}
+            {seven && limitDial(seven, '7d', C.seven_day)}
           </Box>
 
           {env?.repo && (
