@@ -1,7 +1,7 @@
 import type { EngineInterface, On } from 'claude-code'
 
 import type { AgentRow, Env, Limit, Live, Plan, Shell, Subchat } from '../types'
-import { bar, clock, k, modelName, paceOf, span, toneColor } from './format'
+import { bar, clock, elapsedOf, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
 import { BEAD, C, beadsWidth, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
 import { elapsed } from './progress'
@@ -160,24 +160,86 @@ export function registerPane(on: On) {
       const five = l.limits.find(lim => lim.kind === 'five_hour')
       const seven = l.limits.find(lim => lim.kind === 'seven_day')
       const w = weatherOf(l.ctxPercent)
-      const dial = (key: string, percent: number, color: string, value: string, label: string, sub: string, warning: { text: string; color: string } | null) => (
-        <Box key={key} flexDirection="column" alignItems="center" width={DIAL.w + 12}>
-          <Svg source={dialSvg(percent, color)} alt={`${label} ${Math.round(percent)} %`} width={DIAL.w} height={DIAL.h} />
-          <Text bold>{value}</Text>
-          <Text dimColor>{label}</Text>
-          {sub !== '' && <Text dimColor>{sub}</Text>}
-          {warning && <Text color={warning.color}>{warning.text}</Text>}
+      type Dial = { key: string; percent: number; color: string; value: string; label: string; sub: string; pace: number | null; warning: { text: string; color: string } | null; facts: [string, string][] }
+      // Hovered, a dial lights and a card with its details opens under it; the surface draws both, no hook runs.
+      const dial = (d: Dial, side: 'left' | 'middle' | 'right') => (
+        <Box key={d.key} flexDirection="column" alignItems="center" width={DIAL.w + 14} hover={{ backgroundColor: C.card }}>
+          <Svg source={dialSvg(d.percent, d.color, d.value, d.label, d.pace)} alt={`${d.label} ${d.value}`} width={DIAL.w} height={DIAL.h} />
+          {d.sub !== '' && <Text dimColor>{d.sub}</Text>}
+          {d.warning && <Text color={d.warning.color}>{d.warning.text}</Text>}
+          <Box
+            position="absolute"
+            top={6}
+            {...(side === 'left' ? { left: 0 } : side === 'right' ? { right: 0 } : { left: -6 })}
+            width={28}
+            display="none"
+            hover={{ display: 'flex' }}
+            flexDirection="column"
+            paddingX={1}
+            backgroundColor={C.popup}
+            borderStyle="round"
+            borderColor={C.line}
+          >
+            <Text bold>{d.label}</Text>
+            {d.facts.map(([name, fact]) => (
+              <Box key={name} flexDirection="row">
+                <Text dimColor>{name}</Text>
+                <Box flexGrow={1} />
+                <Text>{fact}</Text>
+              </Box>
+            ))}
+          </Box>
         </Box>
       )
-      const limitDial = (lim: Limit, label: string, calm: string) =>
-        dial(lim.kind, lim.percentUsed, toned(paceOf(lim, now), calm), `${Math.round(lim.percentUsed)}%`, label, resetText(lim, now), limitWarning(lim, now))
+      const PACE = { calm: 'ruhig', fast: 'zu schnell', alert: 'kritisch' } as const
+      const limitDial = (lim: Limit, label: string, calm: string, side: 'middle' | 'right') => {
+        const gone = elapsedOf(lim, now)
+        const at = lim.resetsAt ? Date.parse(lim.resetsAt) : null
+        return dial(
+          {
+            key: lim.kind,
+            percent: lim.percentUsed,
+            color: toned(paceOf(lim, now), calm),
+            value: `${Math.round(lim.percentUsed)}%`,
+            label,
+            sub: resetText(lim, now),
+            pace: gone,
+            warning: limitWarning(lim, now),
+            facts: [
+              ['Verbraucht', `${Math.round(lim.percentUsed)} %`],
+              ...(gone !== null ? [[lim.kind === 'five_hour' ? 'Fenster vorbei' : 'Woche vorbei', `${Math.round(gone)} %`] as [string, string]] : []),
+              ['Tempo', PACE[paceOf(lim, now)]],
+              ...(at !== null ? [['Reset', `${resetText(lim, now).replace('↻ ', '')} · in ${span(at - now)}`] as [string, string]] : []),
+            ],
+          },
+          side,
+        )
+      }
 
       return (
         <Box flexDirection="column" rowGap={1} paddingX={1}>
           <Box flexDirection="row">
-            {dial('ctx', l.ctxPercent, l.ctxPercent >= 90 ? C.alert : l.ctxPercent >= 75 ? C.warn : C.context, l.ctxTokens > 0 ? k(l.ctxTokens) : '–', 'Context', l.ctxTokens > 0 ? `${w.glyph} ${w.word}` : 'misst…', ctxWarning(l.ctxPercent))}
-            {five && limitDial(five, '5h', C.five_hour)}
-            {seven && limitDial(seven, '7d', C.seven_day)}
+            {dial(
+              {
+                key: 'ctx',
+                percent: l.ctxPercent,
+                color: l.ctxPercent >= 90 ? C.alert : l.ctxPercent >= 75 ? C.warn : C.context,
+                value: l.ctxTokens > 0 ? k(l.ctxTokens) : '–',
+                label: 'Context',
+                sub: l.ctxTokens > 0 ? `${w.glyph} ${w.word}` : 'misst…',
+                pace: null,
+                warning: ctxWarning(l.ctxPercent),
+                facts: [
+                  ['Belegt', `${k(l.ctxTokens)} von ${k(l.ctxWindow)}`],
+                  ['Anteil', `${Math.round(l.ctxPercent)} %`],
+                  ['Frei', k(Math.max(0, l.ctxWindow - l.ctxTokens))],
+                  ['Wetter', `${w.glyph} ${w.word}`],
+                ],
+              },
+              'left',
+            )}
+            {five && limitDial(five, '5h', C.five_hour, 'middle')}
+            {seven && limitDial(seven, '7d', C.seven_day, 'right')}
           </Box>
 
           {env?.repo && (

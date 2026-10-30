@@ -20,6 +20,7 @@ export const C = {
   line: 'rgba(127,127,127,0.22)',
   card: 'rgba(127,127,127,0.10)',
   segment: 'rgba(127,127,127,0.28)',
+  popup: '#2b2b2b',
 } as const
 
 // A calm value keeps its own color; a warning takes amber, an alert red.
@@ -28,16 +29,33 @@ export const toned = (tone: Tone, calm: string) => (tone === 'alert' ? C.alert :
 const svg = (w: number, h: number, body: string, viewBox = `0 0 ${w} ${h}`) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="${viewBox}">${body}</svg>`
 
-export const DIAL = { w: 84, h: 46 }
-// A half circle filled to the percent, round at both ends.
-export function dialSvg(percent: number, color: string) {
-  const arc = 'M8 42a34 34 0 0 1 68 0'
+const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+
+export const DIAL = { w: 88, h: 80 }
+// A three-quarter ring filled to the percent, the value and its name inside. `pace`, the share of the
+// limit's window gone by, is a white tick on the ring: a fill past it is spending faster than time.
+export function dialSvg(percent: number, color: string, value: string, label: string, pace: number | null) {
+  const r = 34
+  const c = 44
+  const full = 2 * Math.PI * r
+  const arc = full * 0.75
   const p = Math.max(0, Math.min(100, percent))
+  const ring = (stroke: string, length: number) =>
+    `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${stroke}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${length.toFixed(1)} ${full.toFixed(1)}"/>`
+  let tick = ''
+  if (pace !== null) {
+    const a = ((135 + 2.7 * Math.max(0, Math.min(100, pace))) * Math.PI) / 180
+    const at = (d: number) => `${(c + d * Math.cos(a)).toFixed(1)} ${(c + d * Math.sin(a)).toFixed(1)}`
+    tick = `<path d="M${at(r - 7)}L${at(r + 7)}" stroke="#ececec" stroke-opacity=".75" stroke-width="2" stroke-linecap="round"/>`
+  }
+  const text = (y: number, size: number, fill: string, weight: number, s: string) =>
+    `<text x="${c}" y="${y}" text-anchor="middle" fill="${fill}" font-size="${size}" font-weight="${weight}" font-family="Segoe UI, system-ui, sans-serif">${esc(s)}</text>`
   return svg(
     DIAL.w,
     DIAL.h,
-    `<path d="${arc}" fill="none" stroke="${C.track}" stroke-width="7" stroke-linecap="round"/>` +
-      (p > 0 ? `<path d="${arc}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="${p.toFixed(1)} 100"/>` : ''),
+    `<g transform="rotate(135 ${c} ${c})">${ring(C.track, arc)}${p > 0 ? ring(color, (arc * p) / 100) : ''}</g>${tick}` +
+      text(c + 3, 17, '#ececec', 600, value) +
+      text(c + 19, 11, '#9a9a9a', 400, label),
   )
 }
 
