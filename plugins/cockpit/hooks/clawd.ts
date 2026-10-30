@@ -8,8 +8,8 @@ export type Mood = 'running' | 'waiting' | 'done' | 'error'
 // The role from the agent's type and description, by words only; no tokens.
 const ROLE_WORDS: [Role, RegExp][] = [
   ['reviewer', /review|audit|diff|prüf/i],
-  ['tester', /test|verif|check|qa\b/i],
   ['designer', /design|frontend|front-end|\bui\b|\bux\b|css|style|layout|optik/i],
+  ['tester', /test|verif|check|qa\b/i],
   ['writer', /doc|readme|writ|schreib|text|notes?\b/i],
   ['guide', /guide|claude-code|web-?fetch|research|recherch|frage/i],
   ['explorer', /explore|search|find|such|locat|investig|map\b/i],

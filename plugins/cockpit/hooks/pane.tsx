@@ -247,14 +247,18 @@ function agentsTab($: EngineInterface, { Box, Text, Svg, Button }: DesktopUi, ro
             <Svg source={clawdSvg(role, a.state)} alt={`${roleName(role)}, ${word}`} width={CLAWD.w * 0.7} height={CLAWD.h * 0.7} />
             {/* The text is the switch: a press folds the details open; the ring says the state. */}
             <Box flexDirection="column" flexGrow={1} flexShrink={1} minWidth={0}>
+              {/* A button draws one line, so each line is a button of its own, all folding the same details. */}
               <Button key={`agent-${a.id}`} plain onPress={() => void toggleFold($, `agent-${a.id}`)}>
                 <Text bold>{a.description}</Text>
-                {'\n'}
-                <Text dimColor>{[role === 'plain' ? a.type : roleName(role), a.model && modelName(a.model), elapsed((a.endedAt ?? now) - a.startedAt)].filter(Boolean).join(' · ')}</Text>
-                {'\n'}
-                <Text color={a.state === 'waiting' ? C.warn : a.state === 'error' ? C.alert : undefined} dimColor={a.state === 'done'}>
-                  {a.state === 'done' ? t().tools(a.tools ?? 0) : a.tool}
-                </Text>
+              </Button>
+              {a.task && a.task !== a.description && (
+                <Button key={`agent-${a.id}-task`} plain dimColor onPress={() => void toggleFold($, `agent-${a.id}`)}>
+                  <Text dimColor>{a.task}</Text>
+                </Button>
+              )}
+              <Button key={`agent-${a.id}-meta`} plain dimColor onPress={() => void toggleFold($, `agent-${a.id}`)}>
+                <Text dimColor>{[role === 'plain' ? a.type : roleName(role), a.model && modelName(a.model), elapsed((a.endedAt ?? now) - a.startedAt), t().tools(a.tools ?? 0)].filter(Boolean).join(' · ')}</Text>
+                {a.state !== 'done' && a.tool !== '' && <Text color={a.state === 'waiting' ? C.warn : a.state === 'error' ? C.alert : undefined}> · {a.tool}</Text>}
               </Button>
               {folded.includes(`agent-${a.id}`) && (
                 <Box flexDirection="column" marginTop={1}>
@@ -375,15 +379,32 @@ function promptLine(prompt: string | undefined) {
   if (!prompt) return t().turn
   const command = /<command-name>\/?([^<]+)<\/command-name>/.exec(prompt)
   if (command) return `/${command[1]!.trim()}`
+  const folded = /^<(agents|notices) (\d+)>$/.exec(prompt)
+  if (folded) return folded[1] === 'agents' ? t().fromAgents(Number(folded[2])) : t().fromBackgrounds(Number(folded[2]))
   if (prompt.startsWith('<agent-message')) return t().fromAgent
   if (prompt.startsWith('<task-notification')) return t().fromBackground
   if (prompt.startsWith('<')) return prompt.replace(/<[^>]*>/g, '').trim() || t().fromApp
   return prompt
 }
 
+// Turns the app hands in itself, one after the other, as one row: "3 messages from agents", their figures summed.
+function foldAppTurns(turns: Turn[]): Turn[] {
+  const kindOf = (t: Turn) => (t.prompt?.startsWith('<agent-message') ? 'agent' : t.prompt?.startsWith('<task-notification') ? 'notice' : null)
+  const out: (Turn & { n?: number })[] = []
+  for (const turn of turns) {
+    const kind = kindOf(turn)
+    const last = out[out.length - 1]
+    if (kind && last && kindOf(last) === kind) {
+      const n = (last.n ?? 1) + 1
+      out[out.length - 1] = { ...last, at: turn.at, seconds: last.seconds + turn.seconds, tools: last.tools + turn.tools, ctxDelta: last.ctxDelta + turn.ctxDelta, cacheHit: turn.cacheHit, n }
+    } else out.push({ ...turn })
+  }
+  return out.map(t => (t.n ? { ...t, prompt: kindOf(t) === 'agent' ? `<agents ${t.n}>` : `<notices ${t.n}>` } : t))
+}
+
 // Verlauf: a dot per turn with the prompt's opening, events in between, the newest last; the last 15.
 function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: SessionEvent[]) {
-  const rows = [...turns.map(t => ({ at: t.at, turn: t })), ...events.map(e => ({ at: e.at, event: e }))].sort((a, b) => a.at - b.at).slice(-15)
+  const rows = [...foldAppTurns(turns).map(t => ({ at: t.at, turn: t })), ...events.map(e => ({ at: e.at, event: e }))].sort((a, b) => a.at - b.at).slice(-15)
   if (rows.length === 0) return <Text dimColor>{t().noHistory}</Text>
   return (
     <Box flexDirection="column">
@@ -458,7 +479,7 @@ export function registerPane(on: On, options: PaneOptions = {}) {
     const since = tally.since
 
     if (e.surface === 'desktop') {
-      const { Box, Text, Svg, Button } = $.ui.resolve(e)
+      const { Box, Text, Svg, Button, Link } = $.ui.resolve(e)
       if (!l) return <Text dimColor>{t().waitingFirst}</Text>
       const badges: Record<string, { text: string; color: string } | null> = {
         agents: liveAgents > 0 ? { text: String(liveAgents), color: C.agent } : null,
@@ -511,7 +532,6 @@ export function registerPane(on: On, options: PaneOptions = {}) {
         label: string
         sub: string
         pace: number | null
-        paceColor?: string
         warning: { text: string; color: string } | null
         facts: [string, string][]
         parts?: { name: string; tokens: number }[]
@@ -519,11 +539,10 @@ export function registerPane(on: On, options: PaneOptions = {}) {
       // Hovered, a dial's tile lights and a card with its details opens under it; the surface draws both, no hook
       // runs. Tile and card share a hover scope, so only the tile wakes the card.
       const dial = (d: Dial) => (
-        <Box key={d.key} flexDirection="column" alignItems="center" width={DIAL.w + 14}>
+        <Box key={d.key} flexDirection="column" alignItems="center" width="33%">
           <Box flexDirection="column" alignItems="center" paddingX={2} borderStyle="round" borderColor={C.clear} hover={{ scope: `dial-${d.key}`, backgroundColor: C.card, borderColor: C.card }}>
-            <Svg source={dialSvg(d.percent, d.color, d.value, d.label, d.pace, d.paceColor)} alt={`${d.label} ${d.value}`} width={DIAL.w} height={DIAL.h} />
+            <Svg source={dialSvg(d.percent, d.color, d.value, d.label, d.pace, d.warning?.color)} alt={`${d.label} ${d.value}`} width={DIAL.w} height={DIAL.h} />
             {d.sub !== '' && <Text dimColor>{d.sub}</Text>}
-            {d.warning && <Text color={d.warning.color}>{d.warning.text}</Text>}
           </Box>
           {/* Under the tile, centered on its dial, one cell past each side. */}
           <Box
@@ -540,6 +559,7 @@ export function registerPane(on: On, options: PaneOptions = {}) {
             borderColor={C.line}
           >
             <Text bold>{d.label}</Text>
+            {d.warning && <Text color={d.warning.color}>{d.warning.text}</Text>}
             {d.facts.map(([name, fact]) => (
               <Box key={name} flexDirection="row">
                 <Text dimColor>{name}</Text>
@@ -594,7 +614,9 @@ export function registerPane(on: On, options: PaneOptions = {}) {
               <Box flexGrow={1} flexShrink={1} minWidth={0}>
                 <Text wrap="truncate-end">{c.subject}</Text>
               </Box>
-              <Text dimColor>{ageOf(c.age)}</Text>
+              <Box flexShrink={0}>
+                <Text dimColor>{ageOf(c.age)}</Text>
+              </Box>
             </Box>
           ))}
           {env.unpushed === null ? <Text dimColor>{t().noUpstream}</Text> : env.unpushed === 0 ? <Text color={C.ok}>{t().pushed}</Text> : <Text color={C.warn}>{t().unpushed(env.unpushed)}</Text>}
@@ -610,6 +632,12 @@ export function registerPane(on: On, options: PaneOptions = {}) {
             </Box>
           ))}
           {env.files.length > 6 && <Text dimColor>{t().more(env.files.length - 6)}</Text>}
+          {env.isGithub && (
+            <Box flexDirection="row" columnGap={2} marginTop={1}>
+              <Link href={`https://github.com/${env.repo}/tree/${encodeURIComponent(env.branch || env.base)}`}>{t().openOnGithub}</Link>
+              {env.branch !== '' && env.branch !== env.base && <Link href={`https://github.com/${env.repo}/compare/${encodeURIComponent(env.base)}...${encodeURIComponent(env.branch)}`}>{t().compare(env.base)}</Link>}
+            </Box>
+          )}
         </Box>
       )
 
@@ -623,7 +651,6 @@ export function registerPane(on: On, options: PaneOptions = {}) {
           sub: l.ctxTokens > 0 ? `${w.glyph} ${t().weather[w.icon]}` : t().measuring,
           // The tick on the context ring: where a new chat is advised.
           pace: NEW_CHAT_AT,
-          paceColor: C.warn,
           warning: ctxWarning(l.ctxPercent),
           facts: [
             [t().filled, t().ofTotal(k(l.ctxTokens), k(l.ctxWindow))],

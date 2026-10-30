@@ -128,6 +128,7 @@ async function apply($: EngineInterface, u: Reading, toasts: boolean, extra: Par
     $.ui.toast(t().fiveHourAt(Math.round(five.percentUsed)))
   }
   await setLive($, p => ({
+    ...p,
     ctxTokens: u.context.tokens ?? p?.ctxTokens ?? 0,
     ctxWindow: u.context.window,
     ctxPercent: u.context.percent ?? p?.ctxPercent ?? 0,
@@ -266,6 +267,8 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
         await upsertCrew($, {
           id: r.agentId,
           description: e.description || e.subagentType,
+          // The task's opening, for the Agents tab.
+          task: e.prompt.split('\n').find(line => line.trim() !== '')?.trim().slice(0, 120) ?? '',
           type: e.subagentType,
           state: 'running',
           tool: 'Starting',

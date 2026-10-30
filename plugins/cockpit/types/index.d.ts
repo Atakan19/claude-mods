@@ -79,6 +79,8 @@ export type AgentRow = {
   effort?: string
   // Tool calls the agent made so far.
   tools?: number
+  // The opening of the prompt it was given.
+  task?: string
 }
 
 // Claude's own task list (TaskCreate/TaskUpdate or TodoWrite), mirrored as a plan.
