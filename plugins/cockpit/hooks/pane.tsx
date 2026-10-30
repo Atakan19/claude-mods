@@ -183,19 +183,19 @@ export function registerPane(on: On) {
                 </Box>
                 {!folded.includes(g.key) && (
                   // Box sizes count in cells, so a thin line that grows with the cards cannot be drawn; the cards step in instead.
-                    <Box flexDirection="column" rowGap={1} marginLeft={2}>
-                      {g.leaves.map(leaf => (
-                        <Box key={leaf.key} flexDirection="row" columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
-                          <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.sub} width={RING} height={RING} />
-                          <Box flexDirection="column" flexShrink={1}>
-                            {leaf.state === 'done' || leaf.state === 'pending' ? <Text dimColor>{leaf.title}</Text> : <Text>{leaf.title}</Text>}
-                            <Text dimColor>{leaf.sub}</Text>
-                          </Box>
-                          <Box flexGrow={1} />
-                          <Text dimColor>{leaf.time}</Text>
+                  <Box flexDirection="column" rowGap={1} marginLeft={2}>
+                    {g.leaves.map(leaf => (
+                      <Box key={leaf.key} flexDirection="row" columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+                        <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.sub} width={RING} height={RING} />
+                        <Box flexDirection="column" flexShrink={1}>
+                          {leaf.state === 'done' || leaf.state === 'pending' ? <Text dimColor>{leaf.title}</Text> : <Text>{leaf.title}</Text>}
+                          <Text dimColor>{leaf.sub}</Text>
                         </Box>
-                      ))}
-                    </Box>
+                        <Box flexGrow={1} />
+                        <Text dimColor>{leaf.time}</Text>
+                      </Box>
+                    ))}
+                  </Box>
                 )}
               </Box>
             ))}
