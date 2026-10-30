@@ -10,7 +10,7 @@ The session's numbers in one calm place. Grey while all is well; yellow or red o
 | Sounds | | a sound when Claude is done, needs you (a permission dialog, a question) or fails |
 | Reply line | under each reply | duration, tool calls, context added, cost, cache hit rate |
 | Spinner | the working line | tool calls so far this turn |
-| Toasts | notification bar | Claude done, waiting for you, or failed (with or without sound); 5 minutes before the cache lapses; the 5h limit reaching 90% |
+| Toasts | in the chat and as a system notification | Claude done, waiting for you, or failed (with or without sound), as a toast in the chat and a system notification naming the repository and branch, seen from another window; 5 minutes before the cache lapses; the 5h limit reaching 90% |
 
 Each part can be switched off in `/config`.
 
@@ -30,4 +30,4 @@ and [LICENSE-APACHE-2.0](LICENSE-APACHE-2.0).
 
 ## Privacy
 
-Reads only the usage figures Claude Code provides, the subagents' names and models, the names of the tools called, the session's folder and repository, and three arguments: the description of a command sent to the background (never the command itself), the task list's step titles, and the title of a chat the desktop app starts. It changes, blocks and sends nothing; no network requests, no files read. In a git repository it runs `git branch`, `git rev-parse`, `git rev-list --count`, `git status --porcelain` and `git diff --shortstat` after each turn, reading only the branch, the commit counts and how many files changed, and on Windows a sound is played through PowerShell's sound player.
+Reads only the usage figures Claude Code provides, the subagents' names and models, the names of the tools called, the session's folder and repository, and three arguments: the description of a command sent to the background (never the command itself), the task list's step titles, and the title of a chat the desktop app starts. It changes, blocks and sends nothing; no network requests, no files read. In a git repository it runs `git branch`, `git rev-parse`, `git rev-list --count`, `git status --porcelain` and `git diff --shortstat` after each turn, reading only the branch, the commit counts and how many files changed, and on Windows a sound is played through PowerShell's sound player and the notification shown through Windows' own notifications.

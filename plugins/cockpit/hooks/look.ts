@@ -67,30 +67,32 @@ export function ringSvg(state: RingState, color: string) {
 }
 
 // The tree, one line per group in its color. The drawings fix each row's height, so the line runs through.
-export const TWIG = { w: 26, x: 9, head: 32, leaf: 64 }
+export const TWIG = { w: 26, dot: 14, x: 9, head: 32, leaf: 64 }
 const stroke = (color: string) => `fill="none" stroke="${color}" stroke-opacity=".55" stroke-width="1.5"`
 // The group's head: a dot; open, its line starts under it.
 export const headSvg = (color: string, isOpen: boolean) =>
   svg(
-    TWIG.w,
+    isOpen ? TWIG.w : TWIG.dot,
     TWIG.head,
     `<circle cx="${TWIG.x}" cy="${TWIG.head / 2}" r="4" fill="${color}"/>` + (isOpen ? `<path d="M${TWIG.x} ${TWIG.head / 2 + 4}V${TWIG.head}" ${stroke(color)}/>` : ''),
   )
 
 // A folded group: one small ring per entry, so its state reads at a glance.
-export const BEAD = 14
+export const BEAD = 20
+const BEAD_GAP = 4
+export const beadsWidth = (n: number) => n * (BEAD + BEAD_GAP) - BEAD_GAP
 export function beadsSvg(items: { state: RingState; color: string }[]) {
-  const r = 5.2
+  const r = 7.4
   const c = BEAD / 2
   const one = (state: RingState, color: string, x: number) =>
     state === 'done'
-      ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.ok}" stroke-width="1.8"/><path d="M${x - 2.3} ${c + 0.2}l1.6 1.6 3-3.1" fill="none" stroke="${C.ok}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>`
+      ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.ok}" stroke-width="2.2"/><path d="M${x - 3.3} ${c + 0.3}l2.3 2.3 4.3-4.4" fill="none" stroke="${C.ok}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`
       : state === 'error'
-        ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.alert}" stroke-width="1.8"/>`
+        ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.alert}" stroke-width="2.2"/>`
         : state === 'pending'
-          ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.twig}" stroke-width="1.4" stroke-dasharray="2 2"/>`
-          : `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${state === 'waiting' ? C.warn : color}" stroke-width="1.8"/><circle cx="${x}" cy="${c}" r="1.6" fill="${state === 'waiting' ? C.warn : color}"/>`
-  return svg(items.length * BEAD, BEAD, items.map((it, i) => one(it.state, it.color, c + i * BEAD)).join(''))
+          ? `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${C.twig}" stroke-width="1.8" stroke-dasharray="2.6 2.6"/>`
+          : `<circle cx="${x}" cy="${c}" r="${r}" fill="none" stroke="${state === 'waiting' ? C.warn : color}" stroke-width="2.2"/><circle cx="${x}" cy="${c}" r="2.2" fill="${state === 'waiting' ? C.warn : color}"/>`
+  return svg(beadsWidth(items.length), BEAD, items.map((it, i) => one(it.state, it.color, c + i * (BEAD + BEAD_GAP))).join(''))
 }
 // In front of a card: down from the line above, round into the card; the group's last one stops there.
 export function twigSvg(isLast: boolean, color: string) {

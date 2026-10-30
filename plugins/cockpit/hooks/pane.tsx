@@ -3,9 +3,9 @@ import type { EngineInterface, On } from 'claude-code'
 import type { AgentRow, Env, Limit, Live, Plan, Shell, Subchat } from '../types'
 import { bar, clock, k, modelName, paceOf, span, toneColor } from './format'
 import type { RingState } from './look'
-import { BEAD, C, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
+import { BEAD, C, beadsWidth, DIAL, RING, TWIG, beadsSvg, coreSvg, dialSvg, headSvg, repoSvg, ringSvg, toned, twigSvg, weatherOf } from './look'
 import { elapsed } from './progress'
-import { PANE, getCrew, getEnv, getFolded, getLive, getPlan, getShells, getSubchats, getTab, getTally, getTick, setTab, toggleFold } from './state'
+import { PANE, getRunning, getCrew, getEnv, getFolded, getLive, getPlan, getShells, getSubchats, getTab, getTally, getTick, setTab, toggleFold } from './state'
 
 // Finished work stays on its branch this long, pale, then leaves the tree.
 const KEEP_MS = 3 * 60e3
@@ -132,7 +132,10 @@ export function registerPane(on: On) {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const l = await getLive($)
-    const tally = await getTally($)
+    // The turn under way counts at once, its tools as they run.
+    const done = await getTally($)
+    const running = await getRunning($)
+    const tally = { ...done, turns: done.turns + (running.tools > 0 ? 1 : 0), tools: done.tools + running.tools }
     const folded = await getFolded($)
     const tab = await getTab($)
     const env = await getEnv($)
@@ -146,9 +149,9 @@ export function registerPane(on: On) {
       if (!l) return <Text dimColor>Wartet auf die erste Antwort…</Text>
       // A segment switch across the width: the open tab lifts out of the track.
       const tabs = (
-        <Box flexDirection="row" backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
+        <Box flexDirection="row" backgroundColor={C.card} paddingX={1}>
           {TABS.map(t => (
-            <Box key={t.key} flexGrow={1} width="25%" justifyContent="center" backgroundColor={t.key === tab ? C.segment : undefined} borderStyle="round" borderColor={t.key === tab ? C.segment : C.card}>
+            <Box key={t.key} flexGrow={1} width="25%" justifyContent="center" backgroundColor={t.key === tab ? C.segment : undefined}>
               {t.key === tab ? <Button plain label={t.label} onPress={() => void setTab($, t.key)} /> : <Button plain dimColor label={t.label} onPress={() => void setTab($, t.key)} />}
             </Box>
           ))}
@@ -172,7 +175,7 @@ export function registerPane(on: On) {
       return (
         <Box flexDirection="column" rowGap={1} paddingX={1}>
           <Box flexDirection="row">
-            {dial('ctx', l.ctxPercent, l.ctxPercent >= 90 ? C.alert : l.ctxPercent >= 75 ? C.warn : C.context, k(l.ctxTokens), 'Context', `${w.glyph} ${w.word}`, ctxWarning(l.ctxPercent))}
+            {dial('ctx', l.ctxPercent, l.ctxPercent >= 90 ? C.alert : l.ctxPercent >= 75 ? C.warn : C.context, l.ctxTokens > 0 ? k(l.ctxTokens) : '–', 'Context', l.ctxTokens > 0 ? `${w.glyph} ${w.word}` : 'misst…', ctxWarning(l.ctxPercent))}
             {five && limitDial(five, '5h', C.five_hour)}
             {seven && limitDial(seven, '7d', C.seven_day)}
           </Box>
@@ -218,9 +221,9 @@ export function registerPane(on: On) {
             {groups.map(g => (
               <Box key={g.key} flexDirection="column">
                 <Box flexDirection="row" columnGap={1} alignItems="center">
-                  <Svg source={headSvg(g.color, !folded.includes(g.key))} alt={g.title} width={TWIG.w} height={TWIG.head} />
+                  <Svg source={headSvg(g.color, !folded.includes(g.key))} alt={g.title} width={folded.includes(g.key) ? TWIG.dot : TWIG.w} height={TWIG.head} />
                   <Button plain dimColor label={`${folded.includes(g.key) ? '▸' : '▾'} ${g.title}`} onPress={() => void toggleFold($, g.key)} />
-                  {folded.includes(g.key) && <Svg source={beadsSvg(g.leaves)} alt={g.current ?? g.count} width={g.leaves.length * BEAD} height={BEAD} />}
+                  {folded.includes(g.key) && <Svg source={beadsSvg(g.leaves)} alt={g.current ?? g.count} width={beadsWidth(g.leaves.length)} height={BEAD} />}
                   <Box flexGrow={1} />
                   <Text dimColor>{g.count}</Text>
                 </Box>

@@ -5,8 +5,9 @@ import { cacheLeft, cacheTtlMs, k, span } from './format'
 import { retitlePane, startPane } from './pane'
 import { clearDonePlan } from './plan'
 import { FOLD_MS } from './progress'
+import { notify } from './notify'
 import { play } from './sound'
-import { addShell, addSubchat, addTurn, bumpTick, countAgent, dropDoneCrew, endShells, getCrew, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
+import { addShell, addSubchat, addTurn, bumpTick, countAgent, dropDoneCrew, endShells, getCrew, getEnv, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
 
 type Reading = Pick<SessionUsage, 'context' | 'rateLimits' | 'cost'>
 
@@ -53,10 +54,14 @@ async function noteShell($: EngineInterface, description: string | undefined, id
   await addShell($, { id, title: description || 'Shell', startedAt: await $.clock.now(), endedAt: null })
 }
 
-// The sound when it is on, and a toast too: the person may have no speakers on.
-function alert($: EngineInterface, kind: keyof typeof ALERT, sounds: boolean, toasts: boolean) {
+// The sound when it is on, and a toast too: the person may have no speakers on. The toast shows in
+// the chat; the system's notification, naming the session's folder, reaches them in another window.
+async function alert($: EngineInterface, kind: keyof typeof ALERT, sounds: boolean, toasts: boolean) {
   if (sounds) play($, kind)
-  if (toasts) $.ui.toast(ALERT[kind])
+  if (!toasts) return
+  $.ui.toast(ALERT[kind], { timeoutMs: 10_000 })
+  const env = await getEnv($).catch(() => null)
+  notify($, ALERT[kind], env?.repo ? `${env.repo.split('/').pop()} · ${env.branch || env.folder}` : env?.folder || 'Claude Code')
 }
 
 async function apply($: EngineInterface, u: Reading, toasts: boolean, extra: Partial<Live> = {}) {
@@ -188,6 +193,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
   // Each request says what it runs on: the resolved model and its effort. The main loop's
   // replaces the settings' guess at once, so a session started on Sonnet does not read "Opus".
   on('turn.step', async function* ($, e, next) {
+    if (e.agentId === undefined) await apply($, await $.session.usage(), toasts).catch(() => {})
     if (e.agentId === undefined && e.model) {
       const prev = await getLive($)
       const effort = e.effort !== undefined ? String(e.effort) : prev?.effort
@@ -205,7 +211,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
   on('classic.PermissionRequest', async ($, e, next) => {
     const id = e.agent_id
     if (id && (await getCrew($)).some(a => a.id === id)) await upsertCrew($, { id, state: 'waiting', tool: 'Needs approval' })
-    else if (!id) alert($, 'decision', sounds, toasts)
+    else if (!id) void alert($, 'decision', sounds, toasts)
     const answer = await next(e)
     // A settings hook answered it: no dialog is in front of the person.
     if (id && answer.decision) await upsertCrew($, { id, state: 'running', tool: e.tool_name })
@@ -228,7 +234,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     if (agentId === undefined) {
       turnStart.tools += 1
       await setRunning($, { tools: turnStart.tools })
-      if (e.tool === 'AskUserQuestion') alert($, 'decision', sounds, toasts)
+      if (e.tool === 'AskUserQuestion') void alert($, 'decision', sounds, toasts)
     } else if (isCrew) {
       await upsertCrew($, { id: agentId, state: 'running', tool: e.tool })
     }
@@ -258,7 +264,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
       }
       return next(e)
     }
-    if (!e.isAborted) alert($, e.reason === 'answer' ? 'done' : 'error', sounds, toasts)
+    if (!e.isAborted) void alert($, e.reason === 'answer' ? 'done' : 'error', sounds, toasts)
     await apply($, await $.session.usage(), toasts, {
       lastRequestAt: await $.clock.now(),
       ...(e.usage ? { model: e.usage.model } : {}),
