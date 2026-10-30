@@ -12,7 +12,7 @@ export type Live = {
 }
 
 // Where the session runs: the folder, the repository and its branch, how far it is from the main branch, files changed.
-export type Env = { folder: string; repo: string; branch: string; isGithub: boolean; base: string; ahead: number; behind: number; changed: number }
+export type Env = { folder: string; repo: string; branch: string; isGithub: boolean; base: string; ahead: number; behind: number; changed: number; added: number; removed: number }
 
 // The whole session, past the 50 turns kept.
 export type Tally = { turns: number; tools: number; since: number | null }
@@ -65,6 +65,7 @@ declare module 'claude-code' {
       env: Shaped<Env | null>
       tally: Tally
       folded: string[]
+      tab: string
       shells: Shell[]
       subchats: Subchat[]
     }

@@ -65,6 +65,19 @@ export function ringSvg(state: RingState, color: string) {
   return svg(RING, RING, body)
 }
 
+// The tree, one line per group in its color. The drawings fix each row's height, so the line runs through.
+export const TWIG = { w: 26, x: 9, head: 32, leaf: 64 }
+const stroke = (color: string) => `fill="none" stroke="${color}" stroke-opacity=".55" stroke-width="1.5"`
+// The group's head: a dot, its line starts under it.
+export const headSvg = (color: string) =>
+  svg(TWIG.w, TWIG.head, `<circle cx="${TWIG.x}" cy="${TWIG.head / 2}" r="4" fill="${color}"/><path d="M${TWIG.x} ${TWIG.head / 2 + 4}V${TWIG.head}" ${stroke(color)}/>`)
+// In front of a card: down from the line above, round into the card; the group's last one stops there.
+export function twigSvg(isLast: boolean, color: string) {
+  const { w, x, leaf } = TWIG
+  const mid = leaf / 2
+  return svg(w, leaf, `<path d="M${x} 0V${mid - 8}q0 8 8 8H${w}" ${stroke(color)}/>${isLast ? '' : `<path d="M${x} ${mid}V${leaf}" ${stroke(color)}/>`}`)
+}
+
 // The repo card's mark: GitHub's octocat for a GitHub remote, a plain branch fork otherwise.
 export const repoSvg = (isGithub: boolean, color: string) =>
   isGithub

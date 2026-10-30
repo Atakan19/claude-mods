@@ -2,7 +2,7 @@ import type { EngineInterface, On, SessionUsage } from 'claude-code'
 
 import type { Env, Live, Turn } from '../types'
 import { cacheLeft, cacheTtlMs, k, span } from './format'
-import { startPane } from './pane'
+import { retitlePane, startPane } from './pane'
 import { clearDonePlan } from './plan'
 import { FOLD_MS } from './progress'
 import { play } from './sound'
@@ -24,13 +24,15 @@ async function git($: EngineInterface, cwd: string, args: string[]) {
 async function readEnv($: EngineInterface): Promise<Env> {
   const cwd = await $.session.cwd()
   const repo = await $.session.repo().catch(() => null)
-  const none = { folder: base(cwd), repo: '', branch: '', isGithub: false, base: '', ahead: 0, behind: 0, changed: 0 }
+  const none = { folder: base(cwd), repo: '', branch: '', isGithub: false, base: '', ahead: 0, behind: 0, changed: 0, added: 0, removed: 0 }
   if (!repo) return none
   // The remote's main branch if it names one, else the first of origin/main, main, master that exists.
   let main = await git($, cwd, ['rev-parse', '--abbrev-ref', 'origin/HEAD'])
   for (const name of ['origin/main', 'main', 'master']) if (!main && (await git($, cwd, ['rev-parse', '--verify', '--quiet', name]))) main = name
   const [behind, ahead] = (await git($, cwd, ['rev-list', '--left-right', '--count', `${main}...HEAD`])).split(/\s+/).map(Number)
   const status = await git($, cwd, ['status', '--porcelain'])
+  // "3 files changed, 120 insertions(+), 40 deletions(-)"
+  const stat = await git($, cwd, ['diff', '--shortstat', 'HEAD'])
   return {
     ...none,
     repo: repo.remote?.match(/([^/:]+\/[^/]+?)(\.git)?$/)?.[1] ?? base(repo.root),
@@ -40,6 +42,8 @@ async function readEnv($: EngineInterface): Promise<Env> {
     ahead: ahead || 0,
     behind: behind || 0,
     changed: status ? status.split('\n').length : 0,
+    added: Number(/(\d+) insertion/.exec(stat)?.[1] ?? 0),
+    removed: Number(/(\d+) deletion/.exec(stat)?.[1] ?? 0),
   }
 }
 
@@ -141,7 +145,10 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
         const now = await $.clock.now()
         await endShells($, (e.background_tasks ?? []).filter(t => t.type === 'shell').map(t => t.id), now)
         const level = e.effort?.level
-        if (level) await setLive($, p => (p ? { ...p, effort: level } : p) as Live)
+        if (level && (await getLive($))?.effort !== level) {
+          await setLive($, p => (p ? { ...p, effort: level } : p) as Live)
+          await retitlePane($).catch(() => {})
+        }
       }
     } catch {}
     return next(e)
@@ -182,7 +189,12 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
   // replaces the settings' guess at once, so a session started on Sonnet does not read "Opus".
   on('turn.step', async function* ($, e, next) {
     if (e.agentId === undefined && e.model) {
-      await setLive($, p => (p ? { ...p, model: e.model, ...(e.effort !== undefined ? { effort: String(e.effort) } : {}) } : p) as Live).catch(() => {})
+      const prev = await getLive($)
+      const effort = e.effort !== undefined ? String(e.effort) : prev?.effort
+      if (prev && (prev.model !== e.model || prev.effort !== effort)) {
+        await setLive($, p => ({ ...(p ?? prev), model: e.model, ...(effort !== undefined ? { effort } : {}) }))
+        await retitlePane($).catch(() => {})
+      }
     } else if (e.agentId !== undefined && (await getCrew($)).some(a => a.id === e.agentId)) {
       await upsertCrew($, { id: e.agentId, model: e.model, ...(e.effort !== undefined ? { effort: String(e.effort) } : {}) })
     }

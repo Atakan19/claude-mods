@@ -83,7 +83,7 @@ test('the band shows the task list a TaskCreate call made', async ($, on) => {
     surface: 'desktop',
     props: { title: 'Cockpit', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
   })
-  expect(await pane.find({ type: 'Text', text: 'Opus' })).toBeTruthy()
+  expect(await pane.find({ type: 'Text', text: 'Diese Session' })).toBeTruthy()
   expect(await pane.find({ type: 'Text', text: /Folien planen/ })).toBeTruthy()
   await pane.unmount()
 })

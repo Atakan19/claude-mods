@@ -77,7 +77,7 @@ test('band and reply line show one turn', async ($, on) => {
       surface,
       props: { title: 'Cockpit', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} },
     })
-    expect(await pane.find({ type: 'Text', text: 'Opus 5.5' })).toBeTruthy()
+    if (surface === 'terminal') expect(await pane.find({ type: 'Text', text: 'Opus 5.5' })).toBeTruthy()
     for (const leaf of ['Start dev server', 'Pane tabs', 'Explore code', 'Turns']) expect(await pane.find({ type: 'Text', text: new RegExp(leaf) })).toBeTruthy()
     await pane.unmount()
   }
