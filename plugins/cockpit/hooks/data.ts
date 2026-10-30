@@ -178,9 +178,12 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     return r
   })
 
-  // An agent's first request says what it runs on: the resolved model and its effort.
+  // Each request says what it runs on: the resolved model and its effort. The main loop's
+  // replaces the settings' guess at once, so a session started on Sonnet does not read "Opus".
   on('turn.step', async function* ($, e, next) {
-    if (e.agentId !== undefined && (await getCrew($)).some(a => a.id === e.agentId)) {
+    if (e.agentId === undefined && e.model) {
+      await setLive($, p => (p ? { ...p, model: e.model, ...(e.effort !== undefined ? { effort: String(e.effort) } : {}) } : p) as Live).catch(() => {})
+    } else if (e.agentId !== undefined && (await getCrew($)).some(a => a.id === e.agentId)) {
       await upsertCrew($, { id: e.agentId, model: e.model, ...(e.effort !== undefined ? { effort: String(e.effort) } : {}) })
     }
     return yield* next(e)

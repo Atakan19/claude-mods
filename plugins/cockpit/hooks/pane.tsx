@@ -160,7 +160,7 @@ export function registerPane(on: On) {
             </Box>
           )}
 
-          <Box height={1} backgroundColor={C.line} />
+          <Svg source={`<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1" viewBox="0 0 1000 1" preserveAspectRatio="none"><rect width="1000" height="1" fill="${C.line}"/></svg>`} alt="Trennlinie" />
 
           <Box flexDirection="column" rowGap={1}>
             <Box flexDirection="row" columnGap={1} alignItems="center">
@@ -182,10 +182,8 @@ export function registerPane(on: On) {
                   <Text dimColor>{g.count}</Text>
                 </Box>
                 {!folded.includes(g.key) && (
-                  // One line down the group's left edge; it stretches with the cards, however tall they get.
-                  <Box flexDirection="row" alignItems="stretch" columnGap={1}>
-                    <Box width={2} marginLeft={1} backgroundColor={C.twig} />
-                    <Box flexDirection="column" flexGrow={1} rowGap={1}>
+                  // Box sizes count in cells, so a thin line that grows with the cards cannot be drawn; the cards step in instead.
+                    <Box flexDirection="column" rowGap={1} marginLeft={2}>
                       {g.leaves.map(leaf => (
                         <Box key={leaf.key} flexDirection="row" columnGap={1} alignItems="center" paddingX={1} backgroundColor={C.card} borderStyle="round" borderColor={C.card}>
                           <Svg source={ringSvg(leaf.state, leaf.color)} alt={leaf.sub} width={RING} height={RING} />
@@ -198,7 +196,6 @@ export function registerPane(on: On) {
                         </Box>
                       ))}
                     </Box>
-                  </Box>
                 )}
               </Box>
             ))}
