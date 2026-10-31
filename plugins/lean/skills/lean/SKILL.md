@@ -25,6 +25,7 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 
 ## Tests and git
 - Test in rings, quiet: first the tests of the files that really changed (`git diff --name-only`), then their package, the full suite only once, locally, before the push, in the background.
+- A green full run stays valid: after it, test only what changed and what depends on it. Let the tools pick: `pytest --testmon` (pytest-testmon) where installed, `pytest --lf` after a failure, `pytest -x -q` while fixing; `vitest related <files> --run`, `jest --findRelatedTests <files>`. The test guard refuses a needless full run once; send it again only for the final check.
 - Before starting a long run, check the background tasks: never start a run that is already going; wait for its result.
 - Git and GitHub locally: checks, merges and conflicts on this machine, then push once. Do not wait on, poll or re-run GitHub Actions. A CI run that fails on minutes or limits is not a code failure: check locally and go on.
 - Shell output may arrive trimmed with a path to the full log. Read that file only when the trimmed part is not enough.

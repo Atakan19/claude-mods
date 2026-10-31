@@ -5,6 +5,7 @@
   "author": { "name": "Atakan19" },
   "userConfig": {
     "readGuard": { "type": "boolean", "title": "Read guard", "description": "Refuse a whole-file Read of a file over 400 lines once, pointing to Grep and a range; the same Read again goes through", "default": true },
+    "testGuard": { "type": "boolean", "title": "Test guard", "description": "Refuse a full test-suite run once when the last full run in this repo was green and at most 15 files changed since, naming those files and their tests; the same command again goes through", "default": true },
     "agentModel": { "type": "string", "title": "Model for search agents", "description": "What general-purpose and Explore agents run on when the call names no model; inherit keeps the session's model", "options": ["sonnet", "haiku", "inherit"], "default": "sonnet" },
     "handoffAtTokens": { "type": "number", "title": "Handoff at k tokens", "description": "At this context size in thousands of tokens (200 = 200k) Claude saves a handoff brief, then the conversation is cleared or compacted; 0 is off", "default": 0, "min": 0, "max": 1000 },
     "handoffResume": { "type": "boolean", "title": "Handoff: carry on", "description": "After the clear, send the pick-up prompt instead of leaving it in the box, so a session nobody watches keeps working", "default": false },
