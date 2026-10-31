@@ -2,6 +2,14 @@ import { expect, mock, test } from 'claude-code/testing'
 
 import { addTask, finishPlan, fromAppPlan, fromTodos, fromTool, planShare, planState, stuckStep, updateTask } from '../hooks/plan'
 import { subchatStates } from '../hooks/data'
+import { pillLabel } from '../hooks/band'
+
+test('a pill label drops punctuation at the ends of its words', () => {
+  expect(pillLabel('Lesen: die Dateien')).toBe('Lesen')
+  expect(pillLabel('Fix, then test.')).toBe('Fix then')
+  expect(pillLabel('"Auto-Save" bauen')).toBe('Auto-Save')
+  expect(pillLabel('…')).toBe('')
+})
 
 test('TodoWrite lists become a plan and keep step times', async () => {
   const a = fromTodos(null, [

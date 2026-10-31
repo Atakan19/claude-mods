@@ -127,9 +127,14 @@ const FILLER = new Set(
 )
 
 // The pill keeps a step at 10 characters: the filler goes, then whole words while they fit, the
-// first word cut only when it alone is too long. The pane has the full title.
-function pillLabel(title: string, max = 10) {
-  const all = title.trim().split(/\s+/).filter(Boolean)
+// first word cut only when it alone is too long. Punctuation at a word's ends goes ("Lesen:" → "Lesen");
+// inside a word it stays ("Auto-Save"). The pane has the full title.
+export function pillLabel(title: string, max = 10) {
+  const all = title
+    .trim()
+    .split(/\s+/)
+    .map(w => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ''))
+    .filter(Boolean)
   const words = all.filter(w => !FILLER.has(w.toLowerCase()))
   const list = words.length > 0 ? words : all
   let s = list[0] ?? ''
