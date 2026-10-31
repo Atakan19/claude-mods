@@ -23,7 +23,8 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 - New logic gets one focused test in the existing test file and style.
 
 ## Tests and git
-- During work run only the tests for what changed, quiet. The full suite once, locally, before the push, in the background.
+- Test in rings, quiet: first the tests of the files that really changed (`git diff --name-only`), then their package, the full suite only once, locally, before the push, in the background.
+- Before starting a long run, check the background tasks: never start a run that is already going; wait for its result.
 - Git and GitHub locally: checks, merges and conflicts on this machine, then push once. Do not wait on, poll or re-run GitHub Actions. A CI run that fails on minutes or limits is not a code failure: check locally and go on.
 - Shell output may arrive trimmed with a path to the full log. Read that file only when the trimmed part is not enough.
 
@@ -37,6 +38,7 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
   4. `path:line` facts, one each.
   5. Limits: what not to touch.
   6. Test command.
+  7. Runs still going (tests, builds, servers): what, and that they must not be started again.
 
 ## Reply
 - Short words, full content: cover every step and fact the question needs. Cut filler, never substance.

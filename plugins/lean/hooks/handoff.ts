@@ -7,7 +7,9 @@ import type { EngineInterface, On, TurnCompleteInput } from 'claude-code'
 export const SAVE_PROMPT = [
   'The context is large and will be cleared after this turn. Save a brief a fresh session can continue from without re-reading:',
   '1. the goal and what done looks like, 2. what is done, 3. the next step, then the other open steps,',
-  '4. path:line facts, one each, 5. limits: what not to touch, 6. the test command; also decisions with their reasons and open questions.',
+  '4. path:line facts, one each, 5. limits: what not to touch, 6. the test command, first for the files that changed,',
+  '7. background runs still going (tests, builds, servers) with what they do, so they are awaited, never started again;',
+  'also decisions with their reasons and open questions.',
   'Write it to your persistent memory as one project memory named "handoff" (replace an older one) and link it in MEMORY.md;',
   'without a memory directory, write HANDOFF.md in the working directory instead. Then answer with one line saying where it is.',
 ].join(' ')
