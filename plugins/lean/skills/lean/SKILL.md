@@ -15,6 +15,8 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 - A file under about 300 lines: read it whole, once. Every extra turn re-sends the context, so piecewise reads of a short file cost more than one full read.
 - A longer file: locate with Grep or Glob, then Read only the hit range (offset/limit). Never read the same file again in pieces.
 - Do not open files only "for context".
+- Independent calls (reads, searches, git, agents) go in one message. Each extra turn re-sends the whole context.
+- After a successful Edit, do not Read the file again to check it; Edit fails loudly when it does not apply.
 - A search across many files goes to the `scout` agent with a brief. Edits, design and decisions stay here.
 - Browser: read text first (`get_page_text`, `read_page`); a screenshot only to check looks, scaled down.
 
@@ -25,6 +27,7 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 
 ## Tests and git
 - Test in rings, quiet: first the tests of the files that really changed (`git diff --name-only`), then their package, the full suite only once, locally, before the push, in the background.
+- After a change and before a commit, call the `check` tool: lint, typecheck and the tests of the changed files in one call, failures only. Run steps one by one only to dig into a failure.
 - A green full run stays valid: after it, test only what changed and what depends on it. Let the tools pick: `pytest --testmon` (pytest-testmon) where installed, `pytest --lf` after a failure, `pytest -x -q` while fixing; `vitest related <files> --run`, `jest --findRelatedTests <files>`. The test guard refuses a needless full run once; send it again only for the final check.
 - Before starting a long run, check the background tasks: never start a run that is already going; wait for its result.
 - Git and GitHub locally: checks, merges and conflicts on this machine, then push once. Do not wait on, poll or re-run GitHub Actions. A CI run that fails on minutes or limits is not a code failure: check locally and go on.

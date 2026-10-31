@@ -1,4 +1,6 @@
 import type { EngineInterface, Register, ToolCallResult } from 'claude-code'
+import { registerCheckTool } from './check'
+import { registerFormat } from './format'
 import { handoffOptions, registerHandoff } from './handoff'
 import { registerReadGuard } from './read'
 import { agentModelOption, registerRoute } from './route'
@@ -56,6 +58,8 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'PowerShell' }, async ($, e, next) => shorten($, e, await next(e)))
   if (options.readGuard !== false) registerReadGuard(on)
   if (options.testGuard !== false) registerTestGuard(on)
+  if (options.checkTool !== false) registerCheckTool(on)
+  if (options.formatOnEdit === true) registerFormat(on)
   registerRoute(on, agentModelOption(options))
   const handoff = handoffOptions(options)
   if (handoff) registerHandoff(on, handoff)
