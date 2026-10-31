@@ -39,6 +39,13 @@ test('a red vitest run keeps the failure and drops the passing files', () => {
   expect(r.text).toContain('AssertionError')
 })
 
+test('a file printed on purpose stays whole up to the dump size', () => {
+  const file = Array.from({ length: 250 }, (_, i) => `line ${i}`).join('\n')
+  expect(trim('cat hooks/handoff.ts', file).cut).toBe(0)
+  expect(trim('for f in a b; do echo; cat "$f"; done', file).cut).toBe(0)
+  expect(trim('npm run build', file).needsFullOutput).toBe(true)
+})
+
 test('green pytest run collapses to its summary line', () => {
   const r = trim('uv run pytest -q', green)
   expect(r.text).toBe('=============== 566 passed, 12 skipped, 1 warning in 65.87s (0:01:05) ===============')

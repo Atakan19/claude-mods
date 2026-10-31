@@ -59,6 +59,10 @@ export type Trimmed = {
 
 export const FULL_OUTPUT = '{LEAN_FULL_OUTPUT}'
 
+// A file printed on purpose is wanted whole: cutting it costs a second call to read the saved copy.
+export const DUMP_MAX = 400
+const DUMP = /(^|[;&|]\s*)(cat|head|tail|nl|sed\s+-n|Get-Content|gc|type)\s/
+
 export function trim(command: string, output: string): Trimmed {
   let lines = output.replace(ANSI, '').split(/\r?\n/)
   const before = lines.length
@@ -73,7 +77,7 @@ export function trim(command: string, output: string): Trimmed {
     }
   }
 
-  if (lines.length <= MAX_LINES) {
+  if (lines.length <= MAX_LINES || (DUMP.test(command) && lines.length <= DUMP_MAX)) {
     const text = lines.join('\n')
     return { text, cut: before - lines.length, needsFullOutput: false }
   }

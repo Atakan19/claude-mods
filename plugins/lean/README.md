@@ -37,5 +37,5 @@ claude plugin install lean --marketplace Atakan19/claude-mods
 
 ## Notes
 
-- The full output of a shortened command is kept under `.out/` in the plugin folder and not cleaned up.
+- The full output of a shortened command is kept under `.out/` in the plugin folder, in a ring of 100 files; the oldest is overwritten.
 - A command whose output should reach the model whole can write it to a file and have it read.

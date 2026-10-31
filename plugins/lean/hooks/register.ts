@@ -6,6 +6,7 @@ import { registerTestGuard } from './testguard'
 import { FULL_OUTPUT, trim } from './trim'
 
 const EXIT = /^Exit code -?\d+\r?\n/
+export const OUT_SLOTS = 100
 
 type Shell = 'Bash' | 'PowerShell'
 // The fields both shells' records share (BuiltinToolResults in the engine's types).
@@ -33,8 +34,10 @@ async function shorten<T extends Shell>(
 
   let text = out.text
   if (out.needsFullOutput) {
-    // shortcut: one file per long output, never cleaned up; add rotation if the folder grows.
-    const path = `${$.plugin.root}/.out/${Date.now()}-${e.tool_use_id.slice(-6)}.txt`
+    // A ring of OUT_SLOTS files: the engine can write but not delete, so the oldest is overwritten.
+    const slot = Number((await $.store.get('outSlot')) ?? 0) % OUT_SLOTS
+    await $.store.set('outSlot', slot + 1)
+    const path = `${$.plugin.root}/.out/${slot}.txt`
     await $.fs.write(path, raw)
     text = text.replace(FULL_OUTPUT, path)
   }
