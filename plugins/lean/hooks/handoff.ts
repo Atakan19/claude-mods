@@ -32,6 +32,10 @@ export function handoffOptions(options: Record<string, unknown>): Handoff | unde
 
 // Where the flow stands; a reload starts it over.
 let phase: 'watching' | 'saving' | 'finishing' = 'watching'
+// Off after a handoff until the context drops below the size, or one still too large after the
+// clear (a huge CLAUDE.md, a big first read) would hand off again every turn.
+let armed = true
+let warned = false
 
 async function finish($: EngineInterface, { mode, resume }: Handoff) {
   await $.command.run(mode === 'clear' ? { command: 'clear' } : { command: 'compact', args: COMPACT_KEEP })
@@ -49,6 +53,8 @@ async function afterTurn($: EngineInterface, e: TurnCompleteInput, h: Handoff) {
     }
     // The save turn ended; the command runs after this hook, once the session is idle.
     phase = 'finishing'
+    armed = false
+    warned = false
     $.clock.after(0, () => {
       void finish($, h)
         .catch(() => $.ui.toast('lean: handoff clear/compact failed'))
@@ -56,7 +62,15 @@ async function afterTurn($: EngineInterface, e: TurnCompleteInput, h: Handoff) {
     })
   } else if (phase === 'watching' && !e.isAborted) {
     const used = (await $.session.usage()).context.tokens ?? 0
-    if (used < h.tokens) return
+    if (used < h.tokens) {
+      armed = true
+      return
+    }
+    if (!armed) {
+      if (!warned) $.ui.toast(`lean: context still at ${Math.round(used / 1000)}k after the handoff; no new one until it drops below ${h.tokens / 1000}k`, { timeoutMs: 10_000 })
+      warned = true
+      return
+    }
     phase = 'saving'
     $.ui.toast(`lean: context at ${Math.round(used / 1000)}k, saving a handoff, then /${h.mode}`, { timeoutMs: 10_000 })
     void $.prompt.submit({ text: SAVE_PROMPT }).catch(() => (phase = 'watching'))

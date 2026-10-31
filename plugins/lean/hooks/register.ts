@@ -1,9 +1,15 @@
 import type { EngineInterface, Register, ToolCallResult } from 'claude-code'
+import { registerCheckTool, startCheckTool } from './check'
+import { registerCodeTool, startCodeTool } from './code'
+import { registerFormat } from './format'
 import { handoffOptions, registerHandoff } from './handoff'
 import { registerReadGuard } from './read'
+import { agentModelOption, registerRoute } from './route'
+import { registerTestGuard } from './testguard'
 import { FULL_OUTPUT, trim } from './trim'
 
 const EXIT = /^Exit code -?\d+\r?\n/
+export const OUT_SLOTS = 100
 
 type Shell = 'Bash' | 'PowerShell'
 // The fields both shells' records share (BuiltinToolResults in the engine's types).
@@ -31,8 +37,10 @@ async function shorten<T extends Shell>(
 
   let text = out.text
   if (out.needsFullOutput) {
-    // shortcut: one file per long output, never cleaned up; add rotation if the folder grows.
-    const path = `${$.plugin.root}/.out/${Date.now()}-${e.tool_use_id.slice(-6)}.txt`
+    // A ring of OUT_SLOTS files: the engine can write but not delete, so the oldest is overwritten.
+    const slot = Number((await $.store.get('outSlot')) ?? 0) % OUT_SLOTS
+    await $.store.set('outSlot', slot + 1)
+    const path = `${$.plugin.root}/.out/${slot}.txt`
     await $.fs.write(path, raw)
     text = text.replace(FULL_OUTPUT, path)
   }
@@ -50,6 +58,18 @@ export const register: Register = (on, options) => {
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => shorten($, e, await next(e)))
   on('tool.call', { tool: 'PowerShell' }, async ($, e, next) => shorten($, e, await next(e)))
   if (options.readGuard !== false) registerReadGuard(on)
+  if (options.testGuard !== false) registerTestGuard(on)
+  if (options.checkTool !== false) registerCheckTool(on)
+  if (options.codeTool !== false) registerCodeTool(on)
+  // The engine takes one session.start hook per plugin: both tools are registered here.
+  on('session.start', async ($, e, next) => {
+    const r = await next(e)
+    if (options.checkTool !== false) await startCheckTool($).catch(() => {})
+    if (options.codeTool !== false) await startCodeTool($).catch(() => {})
+    return r
+  })
+  if (options.formatOnEdit === true) registerFormat(on)
+  registerRoute(on, agentModelOption(options))
   const handoff = handoffOptions(options)
   if (handoff) registerHandoff(on, handoff)
 }

@@ -63,4 +63,9 @@ test('without carry on the pick-up prompt waits in the box', { options: { handof
   await clock.advance(10)
   expect(log.commands).toEqual(['clear'])
   expect(log.filled).toEqual(['Read the handoff note and continue from there.'])
+
+  // Still over the size right after the clear: no second handoff, no loop.
+  await turn($, 't3')
+  await turn($, 't4')
+  expect(log.submitted).toHaveLength(1)
 })
