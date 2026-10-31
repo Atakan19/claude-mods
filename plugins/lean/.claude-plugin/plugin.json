@@ -1,7 +1,7 @@
 {
   "name": "lean",
-  "version": "0.1.0",
-  "description": "Fewer tokens at the same quality: a lean working skill, trimmed shell output, a cheap read-only scout agent and a handoff before the context grows large.",
+  "version": "0.2.0",
+  "description": "Fewer tokens at the same quality: a lean working skill, trimmed shell output, search agents on cheaper models, a test guard, check and code tools, and a handoff before the context grows large.",
   "author": { "name": "Atakan19" },
   "userConfig": {
     "readGuard": { "type": "boolean", "title": "Read guard", "description": "Refuse a whole-file Read of a file over 400 lines once, pointing to Grep and a range; the same Read again goes through", "default": true },
