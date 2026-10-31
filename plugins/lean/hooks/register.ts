@@ -1,5 +1,6 @@
 import type { EngineInterface, Register, ToolCallResult } from 'claude-code'
 import { handoffOptions, registerHandoff } from './handoff'
+import { registerReadGuard } from './read'
 import { FULL_OUTPUT, trim } from './trim'
 
 const EXIT = /^Exit code -?\d+\r?\n/
@@ -48,6 +49,7 @@ export const register: Register = (on, options) => {
   // No .catch: if a hook throws, the engine passes the untrimmed result through.
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => shorten($, e, await next(e)))
   on('tool.call', { tool: 'PowerShell' }, async ($, e, next) => shorten($, e, await next(e)))
+  if (options.readGuard !== false) registerReadGuard(on)
   const handoff = handoffOptions(options)
   if (handoff) registerHandoff(on, handoff)
 }

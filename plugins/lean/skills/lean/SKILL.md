@@ -1,25 +1,42 @@
 ---
 name: lean
-description: Token-lean agent work without losing quality. Smaller reads, targeted tests, short wording, complete content. Use on every coding task. Stays on until "stop lean" or "normal mode".
+description: Token-lean agent work without losing quality. Small context, ranged reads, targeted tests, local git, short wording with full content. Use on every coding task. Stays on until "stop lean" or "normal mode".
 ---
 
 # Lean
 
-Every turn re-sends the whole context. New file content and command output are the most expensive input. Read less, never think less.
+Every turn re-sends the whole context; reading it again is most of the cost. Keep the context small. Read less, never think less.
 
-## Tools
-- Locate first: Grep or Glob with a narrow pattern, then Read only the hit range (offset/limit). Read a whole file only when it is short or you change most of it.
+## Context
+- One session, one goal. A new topic starts a new session with a brief.
+- Past about 200k the handoff saves a brief and starts over. Keep state that matters in that brief, not only in the chat.
+
+## Read and analyse
+- Locate first with Grep or Glob, then Read only the hit range (offset/limit). Whole files only when short or mostly changed.
 - Do not open files only "for context".
-- A search across many files goes to the `scout` agent, with a brief: the goal, the file:line facts you already have, and what to return. Edits, design and decisions stay here.
+- A search across many files goes to the `scout` agent with a brief. Edits, design and decisions stay here.
+- Browser: read text first (`get_page_text`, `read_page`); a screenshot only to check looks, scaled down.
 
-## Tests and commands
-- Run the tests for what you changed first, quiet (`pytest -q path/to/test_x.py`, one test file, one package). The full suite only before a push or PR, or when asked.
-- Start runs that take minutes in the background and keep working.
-- Shell output may arrive trimmed with a path to the full log. Read that file only when the trimmed part is not enough.
-
-## Work
+## Write
+- Change existing files with small Edits; never rewrite a file over 100 lines with Write.
 - Smallest complete change. Reuse what exists. Follow the repo's CLAUDE.md and its generators; they win over this skill.
 - New logic gets one focused test in the existing test file and style.
+
+## Tests and git
+- During work run only the tests for what changed, quiet. The full suite once, locally, before the push, in the background.
+- Git and GitHub locally: checks, merges and conflicts on this machine, then push once. Do not wait on, poll or re-run GitHub Actions. A CI run that fails on minutes or limits is not a code failure: check locally and go on.
+- Shell output may arrive trimmed with a path to the full log. Read that file only when the trimmed part is not enough.
+
+## Delegating
+- Subagent: search, read, summarise, when you need the result now.
+- Side session: a result of its own (a branch, a PR). Start it on Sonnet unless the task is design or architecture.
+- Every handoff, side session and scout gets this brief:
+  1. Goal, and what done looks like.
+  2. What is done.
+  3. Next step.
+  4. `path:line` facts, one each.
+  5. Limits: what not to touch.
+  6. Test command.
 
 ## Reply
 - Short words, full content: cover every step and fact the question needs. Cut filler, never substance.

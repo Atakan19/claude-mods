@@ -5,9 +5,9 @@ import type { EngineInterface, On, TurnCompleteInput } from 'claude-code'
 
 // What Claude writes before the context goes; memory is read again after a clear.
 export const SAVE_PROMPT = [
-  'The context is large and will be cleared after this turn. Save everything a fresh session needs to continue without re-reading:',
-  'the goal, what is done, the next step first and then the other open steps, decisions and their reasons,',
-  'the files and lines that matter (path:line, one fact each), the test command for what changed, open questions.',
+  'The context is large and will be cleared after this turn. Save a brief a fresh session can continue from without re-reading:',
+  '1. the goal and what done looks like, 2. what is done, 3. the next step, then the other open steps,',
+  '4. path:line facts, one each, 5. limits: what not to touch, 6. the test command; also decisions with their reasons and open questions.',
   'Write it to your persistent memory as one project memory named "handoff" (replace an older one) and link it in MEMORY.md;',
   'without a memory directory, write HANDOFF.md in the working directory instead. Then answer with one line saying where it is.',
 ].join(' ')
