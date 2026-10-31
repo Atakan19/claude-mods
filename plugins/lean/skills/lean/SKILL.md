@@ -10,6 +10,7 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 ## Context
 - One session, one goal. A new topic starts a new session with a brief.
 - Past about 200k the handoff saves a brief and starts over. Keep state that matters in that brief, not only in the chat.
+- CLAUDE.md and the memory index load every turn: keep them a map (where things are, rules, commands), not docs. Details go in files read on demand; one line per memory in MEMORY.md.
 
 ## Read and analyse
 - A file under about 300 lines: read it whole, once. Every extra turn re-sends the context, so piecewise reads of a short file cost more than one full read.
@@ -32,6 +33,7 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 - A green full run stays valid: after it, test only what changed and what depends on it. Let the tools pick: `pytest --testmon` (pytest-testmon) where installed, `pytest --lf` after a failure, `pytest -x -q` while fixing; `vitest related <files> --run`, `jest --findRelatedTests <files>`. The test guard refuses a needless full run once; send it again only for the final check.
 - Before starting a long run, check the background tasks: never start a run that is already going; wait for its result.
 - Git and GitHub locally: checks, merges and conflicts on this machine, then push once. Do not wait on, poll or re-run GitHub Actions. A CI run that fails on minutes or limits is not a code failure: check locally and go on.
+- `gh` reads take only the fields needed: `gh pr view 12 --json state,mergeable --jq '.state'`, `gh run view <id> --log-failed`, never full `gh pr view` or `gh api` dumps.
 - Shell output may arrive trimmed with a path to the full log. Read that file only when the trimmed part is not enough.
 
 ## Delegating

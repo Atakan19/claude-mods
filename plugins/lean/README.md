@@ -39,3 +39,5 @@ claude plugin install lean --marketplace Atakan19/claude-mods
 
 - The full output of a shortened command is kept under `.out/` in the plugin folder, in a ring of 100 files; the oldest is overwritten.
 - A command whose output should reach the model whole can write it to a file and have it read.
+- Claude Code always runs commands on your machine. "Local instead of cloud" saves nothing by itself; only what stays out of the context does.
+- Every loaded MCP tool definition is sent with every request. Turn off servers a project does not use; deferred tools (name only until loaded) cost little.
