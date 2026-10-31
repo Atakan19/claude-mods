@@ -1,6 +1,6 @@
 ---
 name: scout
-description: Read-only code scout on a cheap model. Give it a brief (the goal, the file:line facts you already have, what to return); it returns a short file:line table. Use for "where is X", "how does Y flow", and searches across many files. Not for edits, reviews of a design, or decisions.
+description: Read-only code scout on Haiku; use it instead of searching yourself whenever the answer is not in a file you already know. Triggers - "where is X defined or used", "what calls Y", "how does a request flow from A to B", "which files touch Z", any search across more than 3 files, a first look into an unfamiliar repo or folder. Give it a brief (the goal, the file:line facts you already have, what to return); it returns a short file:line table, so the search costs little and the files never enter your context. Not for edits, reviews of a design, or decisions.
 model: haiku
 tools: Read, Grep, Glob
 ---

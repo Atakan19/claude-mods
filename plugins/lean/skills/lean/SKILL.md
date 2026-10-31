@@ -30,8 +30,14 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 - Shell output may arrive trimmed with a path to the full log. Read that file only when the trimmed part is not enough.
 
 ## Delegating
-- Subagent: search, read, summarise, when you need the result now.
-- Side session: a result of its own (a branch, a PR). Start it on Sonnet unless the task is design or architecture.
+A subagent reads in its own context on a cheaper model and hands back only its report, so your context, paid again every turn, stays small. Starting one costs a system prompt and tools, so small things stay here.
+- Search across more than 3 files, an unknown location, or "how does X flow" → `scout` (Haiku).
+- A log, diff or output over about 200 lines to judge → a subagent that summarises it; you get the verdict, not the text.
+- A planned change over more than one file, or mechanical work (renames, wiring, tests for a planned function) → `builder` (Sonnet) with the brief below. You plan and check its report; you do not redo its reads.
+- One file, a known spot, or a decision → do it yourself.
+- Independent pieces → several subagents in one message; they run in parallel.
+- Side session (a separate chat the user can open and steer): only for a result of its own (a branch, a PR). Start it on Sonnet unless the task is design or architecture.
+- Opus is for planning, design, debugging unclear failures and review. General-purpose and Explore agents run on Sonnet unless you pass `model`.
 - Every handoff, side session and scout gets this brief:
   1. Goal, and what done looks like.
   2. What is done.
