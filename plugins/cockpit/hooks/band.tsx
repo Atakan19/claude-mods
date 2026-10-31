@@ -152,7 +152,7 @@ function barsOf(plan: Plan | null, crew: AgentRow[], now: number): Bar[] {
   if (plan && plan.steps.length > 0 && !(planState(plan).done && now - lastEnd(plan) > FOLD_MS)) {
     const finished = plan.steps.filter(s => s.status === 'completed').length
     // Yellow while a step looks left hanging (see stuckStep).
-    const state: PlanState = finished === plan.steps.length ? 'done' : stuckStep(plan, now) ? 'needs_input' : 'running'
+    const state: PlanState = finished === plan.steps.length ? 'done' : stuckStep(plan, now) ? 'stuck' : 'running'
     return [
       {
         id: PLAN_BAR,

@@ -168,7 +168,7 @@ test('a list left standing turns its pill amber after 15 calls, until it moves',
     { content: 'Build', status: 'in_progress', activeForm: '' },
     { content: 'Ship', status: 'pending', activeForm: '' },
   ]
-  // The state mark in front of the bar: ● running, ? amber.
+  // The state mark in front of the bar: ● running, ⏳ hanging.
   const mark = async () => {
     const band = await $.ui.mount({
       plugin: 'cockpit',
@@ -176,7 +176,7 @@ test('a list left standing turns its pill amber after 15 calls, until it moves',
       surface: 'terminal',
       props: { hasSurvey: false, isWorking: true, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 10 }, view: {} },
     })
-    const found = (await band.find({ type: 'Text', text: '?' })) ? '?' : (await band.find({ type: 'Text', text: '●' })) ? '●' : ''
+    const found = (await band.find({ type: 'Text', text: '⏳' })) ? '⏳' : (await band.find({ type: 'Text', text: '●' })) ? '●' : ''
     await band.unmount()
     return found
   }
@@ -184,7 +184,7 @@ test('a list left standing turns its pill amber after 15 calls, until it moves',
   for (let i = 0; i < 14; i++) await $.tool.call({ tool: 'Read', file_path: '/a' })
   expect(await mark()).toBe('●')
   await $.tool.call({ tool: 'Read', file_path: '/a' })
-  expect(await mark()).toBe('?')
+  expect(await mark()).toBe('⏳')
   await $.tool.call({ tool: 'TodoWrite', todos: [{ ...todos[0], status: 'completed' }, { ...todos[1], status: 'in_progress' }] })
   expect(await mark()).toBe('●')
 })

@@ -9,7 +9,9 @@ export type PlanSubstep = { title: string; status: StepStatus }
 // doneAt: when the step was finished, so a checkpoint can tell how long it took
 export type PlanStep = { title: string; status: StepStatus; substeps: PlanSubstep[]; doneAt?: number }
 export type PlanStage = { name: string; steps: PlanStep[] }
-export type PlanState = 'running' | 'needs_input' | 'error' | 'done'
+// cockpit: stuck is a step left standing through many calls (see plan.ts stuckStep): amber like a wait, an hourglass
+// for its mark, as nothing is asked of the person.
+export type PlanState = 'running' | 'needs_input' | 'stuck' | 'error' | 'done'
 // one subagent shown as a state strip under a bar; depth 1 sits under its parent agent
 export type AgentRun = {
   id: string
@@ -45,9 +47,9 @@ const STRIP_GAP = 2
 // rows of strips per bar, the "+N more" row included: the band above the prompt has room for about 300 px
 const stripBudget = (bars: number) => (bars >= 3 ? 3 : bars === 2 ? 4 : 5)
 const FOLD_MS = 5000 // finished strips stay this long, failed ones stay until the bar closes
-const STATE_COLOR: Record<PlanState, string> = { running: '#7858CA', needs_input: '#AD6400', error: '#C5353E', done: '#18883A' }
+const STATE_COLOR: Record<PlanState, string> = { running: '#7858CA', needs_input: '#AD6400', stuck: '#AD6400', error: '#C5353E', done: '#18883A' }
 const INK = '#FFFFFF'
-const STATE_GLYPH: Record<PlanState, string> = { running: '●', needs_input: '?', error: '!', done: '✓' }
+const STATE_GLYPH: Record<PlanState, string> = { running: '●', needs_input: '?', stuck: '⏳', error: '!', done: '✓' }
 const TRACK_H = 22
 const NARROW = 360
 const isFinished = (s: StepStatus) => s === 'done' || s === 'skipped'
@@ -142,6 +144,7 @@ const fitStrip = (s: string, width: number) => {
 
 const ICON_PATH: Partial<Record<PlanState, string>> = {
   needs_input: 'M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01',
+  stuck: 'M5 22h14M5 2h14M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2',
   error: 'M18 6 6 18M6 6l12 12',
   done: 'M20 6 9 17l-5-5',
 }
@@ -412,8 +415,10 @@ function drawTrack(p: Plan, W: number, now = 0): Track {
   const H = TRACK_H
   const w = atHead(p)
   const done = p.state === 'done'
-  // the fill is exactly the finished share: a fresh plan starts empty
-  const frac = done ? 1 : Math.min(1, w.pos / Math.max(1, w.total))
+  // the fill is the finished share; cockpit: with a step under way it reaches half into that step, so the pill
+  // stands in the middle of the part it names rather than at its left edge
+  const isUnderWay = !done && p.stages.some(s => s.steps.some(x => x.status === 'active'))
+  const frac = done ? 1 : Math.min(1, (w.pos + (isUnderWay ? 0.5 : 0)) / Math.max(1, w.total))
   const fx = frac * W
   const key = p.id
   // a resize redraws at once: a head drawn at another width would glide in from the wrong place
