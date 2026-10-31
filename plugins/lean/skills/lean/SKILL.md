@@ -12,7 +12,8 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 - Past about 200k the handoff saves a brief and starts over. Keep state that matters in that brief, not only in the chat.
 
 ## Read and analyse
-- Locate first with Grep or Glob, then Read only the hit range (offset/limit). Whole files only when short or mostly changed.
+- A file under about 300 lines: read it whole, once. Every extra turn re-sends the context, so piecewise reads of a short file cost more than one full read.
+- A longer file: locate with Grep or Glob, then Read only the hit range (offset/limit). Never read the same file again in pieces.
 - Do not open files only "for context".
 - A search across many files goes to the `scout` agent with a brief. Edits, design and decisions stay here.
 - Browser: read text first (`get_page_text`, `read_page`); a screenshot only to check looks, scaled down.
@@ -42,5 +43,6 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 
 ## Reply
 - Short words, full content: cover every step and fact the question needs. Cut filler, never substance.
+- Explaining a flow: trace it end to end before answering, from the entry point through every branch and check to the final outcome (result, error, block). One line per step with file:line; never merge or drop steps to be short.
 - Result first, paths as file:line, no recap of the diff, no closing offer.
 - Keep not/never/only. Code, paths and errors verbatim.
