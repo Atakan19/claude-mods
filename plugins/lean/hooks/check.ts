@@ -82,6 +82,7 @@ async function checkFiles($: EngineInterface, files: string[] | undefined): Prom
   return out.join('\n')
 }
 
+// Called from the one session.start hook in register.ts.
 export async function startCheckTool($: EngineInterface) {
   await $.tool.register({
     name: TOOL,
@@ -95,11 +96,6 @@ export async function startCheckTool($: EngineInterface) {
 }
 
 export function registerCheckTool(on: On) {
-  on('session.start', async ($, e, next) => {
-    const r = await next(e)
-    await startCheckTool($).catch(() => {})
-    return r
-  })
   on('tool.call', { tool: `mcp__lean__${TOOL}` }, async ($, e) => {
     const files = (e as unknown as { files?: unknown }).files
     return { result: await checkFiles($, Array.isArray(files) ? files.map(String) : undefined) }

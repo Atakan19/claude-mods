@@ -1,5 +1,6 @@
 import type { EngineInterface, Register, ToolCallResult } from 'claude-code'
-import { registerCheckTool } from './check'
+import { registerCheckTool, startCheckTool } from './check'
+import { registerCodeTool, startCodeTool } from './code'
 import { registerFormat } from './format'
 import { handoffOptions, registerHandoff } from './handoff'
 import { registerReadGuard } from './read'
@@ -59,6 +60,14 @@ export const register: Register = (on, options) => {
   if (options.readGuard !== false) registerReadGuard(on)
   if (options.testGuard !== false) registerTestGuard(on)
   if (options.checkTool !== false) registerCheckTool(on)
+  if (options.codeTool !== false) registerCodeTool(on)
+  // The engine takes one session.start hook per plugin: both tools are registered here.
+  on('session.start', async ($, e, next) => {
+    const r = await next(e)
+    if (options.checkTool !== false) await startCheckTool($).catch(() => {})
+    if (options.codeTool !== false) await startCodeTool($).catch(() => {})
+    return r
+  })
   if (options.formatOnEdit === true) registerFormat(on)
   registerRoute(on, agentModelOption(options))
   const handoff = handoffOptions(options)

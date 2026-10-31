@@ -14,6 +14,7 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 ## Read and analyse
 - A file under about 300 lines: read it whole, once. Every extra turn re-sends the context, so piecewise reads of a short file cost more than one full read.
 - A longer file: locate with Grep or Glob, then Read only the hit range (offset/limit). Never read the same file again in pieces.
+- Code: read by shape with the `code` tool. `outline` for a file's classes and functions with line ranges, `def` for one function or class, `refs` for its callers, `map` for a first look at a repo (or read docs/MAP.md where one exists). Write a map to docs/MAP.md only when the user asks.
 - Do not open files only "for context".
 - Independent calls (reads, searches, git, agents) go in one message. Each extra turn re-sends the whole context.
 - After a successful Edit, do not Read the file again to check it; Edit fails loudly when it does not apply.
