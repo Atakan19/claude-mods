@@ -62,6 +62,8 @@ claude plugin install cockpit --marketplace Atakan19/claude-mods --config sounds
 | `replyLine` | on | the line under each reply |
 | `spinner` | on | the tool count in the working line |
 | `sounds`, `toasts` | on | the sound and the toast when Claude is done, waits or fails |
+| `autoSaveAt` | `0` (off) | at this context fill (%) Claude first saves the state as a "handoff" memory (or `HANDOFF.md`), then the conversation is cleared and the prompt box offers to pick up again |
+| `autoSaveMode` | `clear` | what follows the save: `clear`, or `compact` to keep a summary |
 
 </details>
 
@@ -122,6 +124,7 @@ Fork it, or copy the folder. Each part lives in a file of its own under `hooks/`
 | `plan.ts`, `reply.tsx`, `spinner.ts` | the task list reader, the reply line, the working line |
 | `look.ts`, `clawd.ts` | colors and drawings: rings, tree, Clawd's outfits |
 | `data.ts`, `state.ts` | what is read from Claude Code and kept for the session |
+| `autosave.ts` | save, then /clear or /compact at a context threshold |
 | `sound.ts`, `sounds/` | the sounds and when they play |
 
 To drop a part for good, delete its line in `register.tsx`. To try your copy:
