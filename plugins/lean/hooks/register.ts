@@ -1,4 +1,5 @@
 import type { EngineInterface, Register, ToolCallResult } from 'claude-code'
+import { handoffOptions, registerHandoff } from './handoff'
 import { FULL_OUTPUT, trim } from './trim'
 
 const EXIT = /^Exit code -?\d+\r?\n/
@@ -43,8 +44,10 @@ async function shorten<T extends Shell>(
   return { result, context: ran.context } as ToolCallResult<T>
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
   // No .catch: if a hook throws, the engine passes the untrimmed result through.
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => shorten($, e, await next(e)))
   on('tool.call', { tool: 'PowerShell' }, async ($, e, next) => shorten($, e, await next(e)))
+  const handoff = handoffOptions(options)
+  if (handoff) registerHandoff(on, handoff)
 }

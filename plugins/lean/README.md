@@ -5,6 +5,15 @@ Fewer tokens at the same quality. Three parts:
 - **Skill `lean`**: how to work. Locate before reading, read only the hit range, run the tests for what changed (the full suite only before a push), follow the repository's generators, answer in short words with full content.
 - **Hook on Bash and PowerShell**: shortens command output before the model reads it. A green pytest run becomes its summary line; a red one keeps every failure and drops the progress dots; output over 100 lines keeps its first 20 and last 40 lines and saves the whole output to a file the model can open. The status line shows how much was kept out.
 - **Agent `scout`**: a read-only searcher on Haiku. The main chat hands it a brief and gets back a short `file:line` table, so wide searches cost little and keep the main context small.
+- **Handoff** (off by default): past a context size, Claude writes a brief (goal, next step, `path:line` facts, test command, open questions) to memory or `HANDOFF.md`, then the conversation is cleared and the brief is read back. With carry on, the pick-up prompt is sent, so a session nobody watches keeps working.
+
+## Options
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `handoffAtTokens` | `0` (off) | context size in thousands of tokens that starts the handoff (`200` = 200k), whatever the window |
+| `handoffResume` | `false` | after the clear, send the pick-up prompt instead of leaving it in the box |
+| `handoffMode` | `clear` | `clear`, or `compact` to keep a summary |
 
 ## Why
 

@@ -1,6 +1,5 @@
 import type { Register } from 'claude-code'
 
-import { autoSaveAt } from './autosave'
 import { registerBand } from './band'
 import { registerData } from './data'
 import { registerPane } from './pane'
@@ -10,10 +9,8 @@ import { registerSpinner } from './spinner'
 
 // Wiring only: each part lives in its own file and can be switched off in /config.
 export const register: Register = (on, options) => {
-  // Off by default: it clears the conversation on its own.
-  const at = autoSaveAt(options.autoSaveAt)
-  const autoSave = at > 0 ? { at, mode: options.autoSaveMode === 'compact' ? ('compact' as const) : ('clear' as const) } : undefined
-  registerData(on, options.toasts !== false, options.pane !== false, options.sounds !== false, options.language, options.planTool === true, autoSave)
+  // The context handoff (save, then /clear) moved to the lean mod.
+  registerData(on, options.toasts !== false, options.pane !== false, options.sounds !== false, options.language, options.planTool === true)
   if (options.plan !== false) registerPlan(on)
   // Off by default: the tool's description costs tokens on every request.
   if (options.planTool === true) registerPlanTool(on)

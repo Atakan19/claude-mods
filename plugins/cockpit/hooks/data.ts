@@ -1,7 +1,6 @@
 import type { EngineInterface, On, SessionUsage } from 'claude-code'
 
 import type { Env, GitFile, Live, Turn } from '../types'
-import { type AutoSave, autoSaveAfterTurn } from './autosave'
 import { cacheLeft, cacheTtlMs, k, modelName, span } from './format'
 import { retitlePane, startPane } from './pane'
 import { clearDonePlan, LIST_TOOLS, nudgeIfStuck, startPlanTool } from './plan'
@@ -175,7 +174,7 @@ export function subchatStates(text: string): Map<string, boolean> {
 }
 
 // The one source every part draws from: usage, turns, running tools and agents.
-export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boolean, language: unknown, planTool = false, autoSave?: AutoSave) {
+export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boolean, language: unknown, planTool = false) {
   let turnStart = { ctx: 0, cost: 0, tools: 0, prompt: '' }
   let cacheWarned = false
 
@@ -435,8 +434,6 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     // The branch may have moved during the turn; read in the background, so the turn ends at once.
     void refreshEnv($)
 
-    const r = await next(e)
-    if (autoSave) await autoSaveAfterTurn($, e, autoSave).catch(() => {})
-    return r
+    return next(e)
   })
 }
