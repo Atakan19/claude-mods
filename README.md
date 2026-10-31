@@ -10,6 +10,7 @@ Mods for Claude Code. Each mod is a plugin of its own under `plugins/`: install 
 | Mod | What it does |
 | --- | --- |
 | [**cockpit**](plugins/cockpit) | The session's numbers in one calm place: a band above the prompt, a detail pane, and a line under each reply. |
+| [**lean**](plugins/lean) | Fewer tokens at the same quality: a lean working skill, shell output trimmed before the model reads it, and a cheap read-only scout agent. |
 
 <!-- Screenshot: add plugins/cockpit/assets/cockpit.png and uncomment.
 <p align="center"><a href="plugins/cockpit"><img src="plugins/cockpit/assets/cockpit.png" alt="cockpit" width="720"></a></p>

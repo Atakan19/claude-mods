@@ -22,8 +22,6 @@
     "replyLine": { "type": "boolean", "title": "Reply line", "description": "Show a line of figures under each reply", "default": true },
     "spinner": { "type": "boolean", "title": "Spinner", "description": "Add the tool count to the working line", "default": true },
     "sounds": { "type": "boolean", "title": "Sounds", "description": "Play a sound when Claude is done, needs you, or fails", "default": true },
-    "autoSaveAt": { "type": "number", "title": "Auto-save at %", "description": "At this context fill Claude saves the state (memory or HANDOFF.md), then the conversation is cleared or compacted; 0 is off", "default": 0, "min": 0, "max": 100 },
-    "autoSaveMode": { "type": "string", "title": "Auto-save: then", "description": "What follows the save: clear (empty context, memory reloads) or compact (a summary stays)", "options": ["clear", "compact"], "default": "clear" },
     "toasts": { "type": "boolean", "title": "Toasts", "description": "Say when Claude is done, needs you or fails; warn before the cache lapses and at 90% of the 5h limit", "default": true }
   }
 }
