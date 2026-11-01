@@ -11,7 +11,9 @@ What is a **hook** runs in code on every matching call and works whatever the mo
 | Skill `lean` | skill | How to work: locate before reading, read short files whole and long ones by range, independent calls in one message, tests in rings, `gh` with `--json`, delegate wide searches, short words with full content. |
 | Shell trim | hook | Shortens Bash and PowerShell output before the model reads it. A green pytest, jest, vitest, cargo or go run becomes its summary line; a red one keeps every failure. Output over 100 lines keeps its first 20 and last 40 lines and the whole output goes to a file the model can open. File dumps (`cat`, `head`, `sed -n`, `Get-Content`, `type`) up to 400 lines stay whole. The status line shows how much was kept out. |
 | Read guard | hook | A Read without a range on a text file over 400 lines is refused once, with a pointer to Grep and offset/limit; the same Read again goes through. |
-| Agent routing | hook | A general-purpose or Explore agent started without a model runs on Sonnet (option `agentModel`). |
+| Agent routing | hook | A general-purpose or Explore agent started without a model runs on Sonnet (option `agentModel`); so does a new side session (option `sideSessionModel`). |
+| Model hint | skill | Sonnet as the default: in the first reply to a task, Claude says in one line when the task needs Opus or Haiku is enough. You switch in the model menu. |
+| Ship rule | skill | Commit each green step; push, PR, merge, deploy and restart only when the goal is done, you ask, or the change cannot be verified otherwise. |
 | Agent `scout` | agent | Read-only searcher on Haiku. Gets a brief, returns a short `file:line` table. |
 | Agent `builder` | agent | Planned multi-file or mechanical changes on Sonnet, from a brief; reports back what it changed. |
 | Test guard | hook | After a green full test run, a full-suite command with at most 15 changed files since is refused once, naming those files and their tests. The same command again goes through. |
@@ -30,6 +32,7 @@ What is a **hook** runs in code on every matching call and works whatever the mo
 | `codeTool` | `true` | offer the `code` tool; its description rides every request |
 | `formatOnEdit` | `false` | format an edited file with the repo's formatter; a file changed under Claude can force a re-read, so it is off |
 | `agentModel` | `sonnet` | model for general-purpose and Explore agents that name none: `sonnet`, `haiku` or `inherit` |
+| `sideSessionModel` | `claude-sonnet-5-5` | model id for a new side session that names none; `inherit` keeps the session's model |
 | `handoffAtTokens` | `0` (off) | context size in thousands of tokens that starts the handoff (`200` = 200k), whatever the window |
 | `handoffResume` | `false` | after the clear, send the pick-up prompt instead of leaving it in the box, so a session nobody watches keeps working |
 | `handoffMode` | `clear` | `clear`, or `compact` to keep a summary |
