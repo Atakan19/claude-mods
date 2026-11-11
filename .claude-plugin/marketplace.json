@@ -7,11 +7,6 @@
       "name": "cockpit",
       "source": "./plugins/cockpit",
       "description": "Session cockpit: band above the prompt, detail pane, a line under each reply"
-    },
-    {
-      "name": "lean",
-      "source": "./plugins/lean",
-      "description": "Fewer tokens at the same quality: a lean working skill, trimmed shell output, search agents on cheaper models, guards, and check and code tools"
     }
   ]
 }

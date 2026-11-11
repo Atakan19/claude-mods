@@ -2,7 +2,7 @@
   "name": "claude-mods",
   "version": "0.1.0",
   "private": true,
-  "description": "Mods for Claude Code: cockpit (session band and pane) and lean (fewer tokens at the same quality).",
+  "description": "Mods for Claude Code: cockpit, a session band, pane and reply line.",
   "keywords": ["claude-code", "claude-code-plugin", "plugin", "mod", "cockpit", "tokens", "marketplace"],
   "license": "MIT",
   "author": "Atakan19",
@@ -10,7 +10,7 @@
   "repository": { "type": "git", "url": "git+https://github.com/Atakan19/claude-mods.git" },
   "bugs": { "url": "https://github.com/Atakan19/claude-mods/issues" },
   "scripts": {
-    "validate": "claude plugin validate . && claude plugin validate plugins/cockpit && claude plugin validate plugins/lean",
-    "test": "claude plugin test plugins/cockpit && claude plugin test plugins/lean"
+    "validate": "claude plugin validate . && claude plugin validate plugins/cockpit",
+    "test": "claude plugin test plugins/cockpit"
   }
 }

@@ -6,7 +6,7 @@ body:
     id: mod
     attributes:
       label: Mod
-      options: [cockpit, lean, new mod, other]
+      options: [cockpit, new mod, other]
     validations: { required: true }
   - type: textarea
     id: problem
