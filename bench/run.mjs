@@ -66,7 +66,8 @@ function claude(armName, work, prompt, sessionArgs) {
   const r = spawnSync('claude', args, { cwd: work, encoding: 'utf8', env: childEnv(), timeout: 1_800_000, maxBuffer: 64 << 20, shell: process.platform === 'win32' })
   let j = null
   try { j = JSON.parse(r.stdout) } catch { /* stays null */ }
-  return { j, ms: Date.now() - t0, err: j ? undefined : (r.stderr || r.stdout || '').slice(0, 500) }
+  const err = j ? (j.is_error ? String(j.result).slice(0, 300) : undefined) : (r.stderr || r.stdout || '').slice(0, 500)
+  return { j: j && !j.is_error ? j : null, ms: Date.now() - t0, err }
 }
 
 const picked = cfg.tasks.filter((t) => (!taskFilter || taskFilter.includes(t.id)) && (!repoFilter || repoFilter.includes(t.repo)))
