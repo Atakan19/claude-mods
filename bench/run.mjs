@@ -32,7 +32,10 @@ mkdirSync(cache, { recursive: true }); mkdirSync(outDir, { recursive: true })
 const resultsFile = join(outDir, `${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`)
 
 // Commands in tasks.json are written for bash (Git Bash on Windows).
-const sh = (cmd, cwd, env) => spawnSync('bash', ['-c', cmd], { cwd, encoding: 'utf8', env: { ...process.env, ...env }, timeout: 600_000 })
+// On Windows plain `bash` can be WSL's, which cannot read C:/ paths: prefer Git Bash.
+const gitBash = 'C:\\Program Files\\Git\\bin\\bash.exe'
+const BASH = process.env.BENCH_BASH ?? (process.platform === 'win32' && existsSync(gitBash) ? gitBash : 'bash')
+const sh = (cmd, cwd, env) => spawnSync(BASH, ['-c', cmd], { cwd, encoding: 'utf8', env: { ...process.env, ...env }, timeout: 600_000 })
 
 // One pinned clone per repo, set up once; every run works on a fresh copy.
 function prepare(repo) {
@@ -109,6 +112,7 @@ for (const task of picked) {
         cost: sum((j) => j.total_cost_usd), turns: sum((j) => j.num_turns), ms: calls.reduce((a, c) => a + c.ms, 0),
         input: sum((j) => j.usage?.input_tokens), output: sum((j) => j.usage?.output_tokens),
         cacheRead: sum((j) => j.usage?.cache_read_input_tokens), cacheWrite: sum((j) => j.usage?.cache_creation_input_tokens),
+        verifyTail: verify && verify.status !== 0 ? `${verify.stdout}${verify.stderr}`.slice(-400) : undefined,
         denials: sum((j) => j.permission_denials?.length),
         answer: task.kind === 'explain' ? js.at(-1)?.result : String(js.at(-1)?.result ?? '').slice(0, 400), error: calls.find((c) => c.err)?.err,
       }

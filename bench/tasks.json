@@ -18,7 +18,7 @@
       "id": "click-fix-format-filename",
       "repo": "click",
       "kind": "fix",
-      "prepare": "sed -i '458s/basename/dirname/' src/click/utils.py",
+      "prepare": "sed -i '458s/basename/dirname/' src/click/utils.py && git -c user.email=bench@example.com -c user.name=bench commit -qam 'refactor: format_filename'",
       "prompt": "The test tests/test_utils/test_format_filename.py fails. Find the cause in the source and fix it. Run only that test file to confirm.",
       "verify": "PYTHONPATH=src \"$PY\" -m pytest -q tests/test_utils/test_format_filename.py"
     },
