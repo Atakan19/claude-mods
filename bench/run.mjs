@@ -63,7 +63,7 @@ function claude(armName, work, prompt, sessionArgs) {
   const args = ['-p', prompt, '--output-format', 'json', '--model', model, '--max-budget-usd', budget,
     '--setting-sources', 'project', '--strict-mcp-config', '--allowedTools', 'Read Edit Write Bash Glob Grep', ...sessionArgs]
   if (arm.plugin) args.push('--plugin-dir', join(root, 'plugins', 'lean'))
-  else args.push('--disable-slash-commands')
+  if (!arm.plugin || arm.noSkills) args.push('--disable-slash-commands') // noSkills: the hooks without the skill text
   if (arm.config) args.push('--settings', JSON.stringify({ pluginConfigs: { lean: arm.config } }))
   const t0 = Date.now()
   const r = spawnSync('claude', args, { cwd: work, encoding: 'utf8', env: childEnv(), timeout: 1_800_000, maxBuffer: 64 << 20 })

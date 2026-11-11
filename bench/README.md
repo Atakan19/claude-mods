@@ -25,6 +25,18 @@ node bench/analyze.mjs bench/results/<file>.jsonl
 - Runs execute code of the cloned repos (their tests) with `Bash` allowed inside a temp copy. Only add repos you trust.
 - Commands in `tasks.json` are bash; on Windows use Git Bash. `PY` points to the repo's venv python.
 
+## First result (pilot, 2026-11-11)
+
+click (17 files), Sonnet, 5 repetitions per cell, 90 % intervals. Lean 0.2 against baseline:
+
+| Task | Cost | Context volume | Tests |
+| --- | --- | --- | --- |
+| explain a flow | +35 % [+19, +90] | +30 % | n/a (not yet judged) |
+| fix a seeded bug | +20 % [+8, +33] | -8 % | 5/5 both |
+| 25-turn session | +9 % [-7, +28] | +4 % | 5/5 both |
+
+On a small repository lean did not save anything; `lean-notools` (no check/code tool) was no cheaper than full lean. Caveats: small repo, sessions far below the context sizes lean is built for, and it is unverified that the hooks load in `-p` mode. The arm `lean-hooks` (hooks without the skill text) separates the two.
+
 ## Not yet covered
 
 - A large repository (the pilot has only click, 17 files). Add one with a fast test suite.
