@@ -1,0 +1,39 @@
+{
+  "repos": [
+    {
+      "name": "click",
+      "url": "https://github.com/pallets/click",
+      "commit": "8abb77a8432e03ed14a95f972b44f905279415a7",
+      "setup": "python -m venv .venv && .venv/Scripts/python -m pip install -q pytest 2>/dev/null || .venv/bin/python -m pip install -q pytest"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "click-explain-flow",
+      "repo": "click",
+      "kind": "explain",
+      "prompt": "Explain how a command line like `app --opt x sub` flows from Command.main() through parsing to the callback of the subcommand. Name the files and functions involved. Do not change any files."
+    },
+    {
+      "id": "click-fix-format-filename",
+      "repo": "click",
+      "kind": "fix",
+      "prepare": "sed -i '458s/basename/dirname/' src/click/utils.py",
+      "prompt": "The test tests/test_utils/test_format_filename.py fails. Find the cause in the source and fix it. Run only that test file to confirm.",
+      "verify": "PYTHONPATH=src \"$PY\" -m pytest -q tests/test_utils/test_format_filename.py"
+    },
+    {
+      "id": "click-long-session",
+      "repo": "click",
+      "kind": "long",
+      "prompts": [
+        "Where is shell completion implemented in this repository and how is it triggered? Do not change files.",
+        "Which tests cover it, and what do they check?",
+        "In click.types, how does Choice validate a value, and what changes with case_sensitive=False?",
+        "How does the Option class decide whether to prompt for a value? Point to the code.",
+        "Add a unit test to tests/test_utils/test_format_filename.py for format_filename with a trailing slash and shorten=True, then run that test file."
+      ],
+      "verify": "PYTHONPATH=src \"$PY\" -m pytest -q tests/test_utils/test_format_filename.py"
+    }
+  ]
+}
