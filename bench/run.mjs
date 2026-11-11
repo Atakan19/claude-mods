@@ -109,10 +109,11 @@ for (const task of picked) {
         cost: sum((j) => j.total_cost_usd), turns: sum((j) => j.num_turns), ms: calls.reduce((a, c) => a + c.ms, 0),
         input: sum((j) => j.usage?.input_tokens), output: sum((j) => j.usage?.output_tokens),
         cacheRead: sum((j) => j.usage?.cache_read_input_tokens), cacheWrite: sum((j) => j.usage?.cache_creation_input_tokens),
-        answer: task.kind === 'explain' ? js.at(-1)?.result : undefined, error: calls.find((c) => c.err)?.err,
+        denials: sum((j) => j.permission_denials?.length),
+        answer: task.kind === 'explain' ? js.at(-1)?.result : String(js.at(-1)?.result ?? '').slice(0, 400), error: calls.find((c) => c.err)?.err,
       }
       appendFileSync(resultsFile, JSON.stringify(row) + '\n')
-      console.log(`${task.id} ${armName} #${rep}: $${row.cost.toFixed(3)} ${row.turns} turns pass=${row.pass}${row.ok ? '' : ' ERROR ' + (row.error ?? '')}`)
+      console.log(`${task.id} ${armName} #${rep}: $${row.cost.toFixed(3)} ${row.turns} turns pass=${row.pass} denials=${row.denials}${row.ok ? '' : ' ERROR ' + (row.error ?? '')}`)
       cleanup(work)
     }
   }

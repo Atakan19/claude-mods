@@ -16,7 +16,10 @@ function ratioCI(a, b, n = 2000) {
 const group = (list, f) => list.reduce((m, r) => ((m[f(r)] ??= []).push(r), m), {})
 const pct = (x) => `${x >= 1 ? '+' : ''}${((x - 1) * 100).toFixed(0)}%`
 
-console.log('task | arm | n | cost (median) | vs baseline [90% CI] | turns | cacheRead | pass')
+// Context volume = every input token the model read (fresh, cached, newly cached). Unlike the cost it does not
+// depend on whether the prompt cache happened to be warm, which differs between arms (each arm has its own prefix).
+for (const r of good) r.ctx = r.input + r.cacheRead + r.cacheWrite
+console.log('task | arm | n | cost (median) | vs baseline [90% CI] | context volume vs baseline | turns | pass')
 for (const [task, tr] of Object.entries(group(good, (r) => r.task))) {
   const base = tr.filter((r) => r.arm === 'baseline').map((r) => r.cost)
   for (const [arm, ar] of Object.entries(group(tr, (r) => r.arm))) {
@@ -27,7 +30,9 @@ for (const [task, tr] of Object.entries(group(good, (r) => r.task))) {
       const [lo, hi] = ratioCI(c, base)
       vs = `${pct(med(c) / med(base))} [${pct(lo)}, ${pct(hi)}]`
     }
-    console.log([task, arm, ar.length, `$${med(c).toFixed(3)}`, vs, med(ar.map((r) => r.turns)).toFixed(0),
-      `${(med(ar.map((r) => r.cacheRead)) / 1000).toFixed(0)}k`, graded.length ? `${graded.filter((r) => r.pass).length}/${graded.length}` : '-'].join(' | '))
+    const baseCtx = tr.filter((r) => r.arm === 'baseline').map((r) => r.ctx)
+    const ctx = med(ar.map((r) => r.ctx))
+    console.log([task, arm, ar.length, `$${med(c).toFixed(3)}`, vs,
+      `${(ctx / 1000).toFixed(0)}k` + (arm !== 'baseline' && baseCtx.length ? ` (${pct(ctx / med(baseCtx))})` : ''), med(ar.map((r) => r.turns)).toFixed(0), graded.length ? `${graded.filter((r) => r.pass).length}/${graded.length}` : '-'].join(' | '))
   }
 }
