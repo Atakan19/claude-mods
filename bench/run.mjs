@@ -70,7 +70,17 @@ function claude(armName, work, prompt, sessionArgs) {
   return { j: j && !j.is_error ? j : null, ms: Date.now() - t0, err }
 }
 
-const picked = cfg.tasks.filter((t) => (!taskFilter || taskFilter.includes(t.id)) && (!repoFilter || repoFilter.includes(t.repo)))
+// Git's pack files are read-only, which makes a plain rmSync fail with EPERM on Windows; a failed cleanup never stops the run.
+function cleanup(dir) {
+  try {
+    if (process.platform === 'win32') spawnSync('attrib', ['-r', `${dir}\\*`, '/s', '/d'], { stdio: 'ignore' })
+    rmSync(dir, { recursive: true, force: true, maxRetries: 3 })
+  } catch (e) {
+    console.log(`could not remove ${dir}: ${e.code}`)
+  }
+}
+
+const picked =cfg.tasks.filter((t) => (!taskFilter || taskFilter.includes(t.id)) && (!repoFilter || repoFilter.includes(t.repo)))
 console.log(`${picked.length * arms.length * reps} runs, model ${model}, cap $${budget} per prompt -> ${resultsFile}`)
 if (dry) process.exit(0)
 
@@ -103,7 +113,7 @@ for (const task of picked) {
       }
       appendFileSync(resultsFile, JSON.stringify(row) + '\n')
       console.log(`${task.id} ${armName} #${rep}: $${row.cost.toFixed(3)} ${row.turns} turns pass=${row.pass}${row.ok ? '' : ' ERROR ' + (row.error ?? '')}`)
-      rmSync(work, { recursive: true, force: true })
+      cleanup(work)
     }
   }
 }
