@@ -16,7 +16,7 @@ export function registerReply(on: On) {
     const parts = [
       `⏱ ${t.seconds}s`,
       `${t.tools} Tools`,
-      `+${k(t.ctxDelta)} Context`,
+      `+${k(Math.max(0, t.ctxDelta))} Context`,
       ...(t.cacheHit > 0 ? [`Cache ${t.cacheHit}%`] : []),
     ]
 

@@ -503,7 +503,7 @@ function historyTab({ Box, Text, Svg }: DesktopUi, turns: Turn[], events: Sessio
                     <Svg source={durationSvg(turn.seconds / longest, isApp ? C.track : C.chat)} alt={elapsed(turn.seconds * 1000)} height={5} />
                   </Box>
                   <Box flexShrink={0}>
-                    <Text dimColor>+{k(turn.ctxDelta)}</Text>
+                    <Text dimColor>+{k(Math.max(0, turn.ctxDelta))}</Text>
                   </Box>
                 </Box>
               </Box>
@@ -591,7 +591,7 @@ export function registerPane(on: On, options: PaneOptions = {}) {
             <Text key={`${turn.at}-${i}`}>
               <Text dimColor>{clock(turn.at)}</Text> {promptLine(turn.prompt)}{' '}
               <Text dimColor>
-                · {elapsed(turn.seconds * 1000)} · +{k(turn.ctxDelta)}
+                · {elapsed(turn.seconds * 1000)} · +{k(Math.max(0, turn.ctxDelta))}
               </Text>
             </Text>
           ))}

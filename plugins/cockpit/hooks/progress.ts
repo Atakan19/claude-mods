@@ -257,10 +257,10 @@ const FLICKER = (() => {
   })
 })()
 const FLICKER_CSS = FLICKER.map(f => f.css).join('')
-// the twinkle option in /config (#23). Off, the fill stands still as reduce motion draws it, the flicker left out and
+// the twinkle switch. Off, the fill stands still as reduce motion draws it, the flicker left out and
 // the wave's bands kept where they start, and the strips' dots and the terminal fill hold their middle brightness; the
 // clocks, the glides and the agents' status dots still move
-let isTwinkling = true
+const isTwinkling = true
 
 // the engine refuses the whole band, every bar in it, when one picture's source passes 131072 characters. A plan of
 // hundreds of steps would get there through its marks and their hover tips (a few pixels apart they only cover each
