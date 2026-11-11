@@ -2,7 +2,7 @@
 *.log
 .mcpb-cache/
 **/.claude-plugin/types/
-plugins/lean/.out/
+bench/
 node_modules/
 .env
 .env.*
