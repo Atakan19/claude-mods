@@ -63,7 +63,7 @@ function claude(armName, work, prompt, sessionArgs) {
   else args.push('--disable-slash-commands')
   if (arm.config) args.push('--settings', JSON.stringify({ pluginConfigs: { lean: arm.config } }))
   const t0 = Date.now()
-  const r = spawnSync('claude', args, { cwd: work, encoding: 'utf8', env: childEnv(), timeout: 1_800_000, maxBuffer: 64 << 20, shell: process.platform === 'win32' })
+  const r = spawnSync('claude', args, { cwd: work, encoding: 'utf8', env: childEnv(), timeout: 1_800_000, maxBuffer: 64 << 20 })
   let j = null
   try { j = JSON.parse(r.stdout) } catch { /* stays null */ }
   const err = j ? (j.is_error ? String(j.result).slice(0, 300) : undefined) : (r.stderr || r.stdout || '').slice(0, 500)
