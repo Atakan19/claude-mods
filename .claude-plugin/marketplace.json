@@ -11,7 +11,7 @@
     {
       "name": "lean",
       "source": "./plugins/lean",
-      "description": "Fewer tokens at the same quality: a lean working skill, trimmed shell output and a cheap read-only scout agent"
+      "description": "Fewer tokens at the same quality: a lean working skill, trimmed shell output, search agents on cheaper models, guards, and check and code tools"
     }
   ]
 }

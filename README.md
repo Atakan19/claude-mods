@@ -1,16 +1,19 @@
 # claude-mods
 
+[![CI](https://github.com/Atakan19/claude-mods/actions/workflows/ci.yml/badge.svg)](https://github.com/Atakan19/claude-mods/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 
-Mods for Claude Code. Each mod is a plugin of its own under `plugins/`: install the ones you want, switch off the parts you don't, copy the rest.
+Mods for Claude Code: a session cockpit and a token-saving toolkit, as plugins you can install one by one.
+
+Each mod is a plugin of its own under `plugins/`: install the ones you want, switch off the parts you don't, copy the rest.
 
 ## Mods
 
 | Mod | What it does |
 | --- | --- |
 | [**cockpit**](plugins/cockpit) | The session's numbers in one calm place: a band above the prompt, a detail pane, and a line under each reply. |
-| [**lean**](plugins/lean) | Fewer tokens at the same quality: a lean working skill, shell output trimmed before the model reads it, and a cheap read-only scout agent. |
+| [**lean**](plugins/lean) | Fewer tokens at the same quality: a lean working skill, shell output trimmed before the model reads it, guards against needless reads and test runs, search agents on cheaper models, and `check` and `code` tools. |
 
 <!-- Screenshot: add plugins/cockpit/assets/cockpit.png and uncomment.
 <p align="center"><a href="plugins/cockpit"><img src="plugins/cockpit/assets/cockpit.png" alt="cockpit" width="720"></a></p>
@@ -27,6 +30,18 @@ claude plugin install cockpit --marketplace Atakan19/claude-mods
 In the desktop app: click **+** next to the prompt box → **Plugins** → **Add marketplace** with `Atakan19/claude-mods` → **Add plugin**.
 
 Each mod's README lists its options and how to keep only some parts.
+
+## Usage
+
+Once installed, the mods work on their own. cockpit shows its band above the prompt and opens its pane with `/cockpit`; lean loads its skill and hooks in every session. Nothing needs to be called by hand.
+
+## Configuration
+
+Every part of every mod has its own option. Set it at install with `--config name=value`, later in `/config`, or under `pluginConfigs.<mod>` in your Claude Code settings. The full option tables are in each mod's README: [cockpit](plugins/cockpit#take-only-what-you-want), [lean](plugins/lean#options).
+
+## Compatibility
+
+Developed and tested against Claude Code **2.1.314**, in the terminal and the desktop app. The mods use Claude Code's plugin and mod API, so older versions may lack parts of it; put `claude --version` in any bug report.
 
 ## Build your own
 
