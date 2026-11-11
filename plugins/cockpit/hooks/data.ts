@@ -223,7 +223,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
   })
 
   // The desktop app's own sessions, started from this one: only their title is read.
-  on('tool.call', { tool: 'mcp__ccd_session__start_session' }, async ($, e, next) => {
+  on('tool.call', { tool: /^mcp__ccd_session__start_session$/ }, async ($, e, next) => {
     const r = await next(e)
     try {
       const title = (e as { title?: unknown }).title
@@ -389,7 +389,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
       }
       // A step left hanging: one line for Claude after this result.
       const nudge = agentId === undefined && !('deny' in r) && !LIST_TOOLS.has(e.tool) ? await nudgeIfStuck($) : null
-      if (nudge) return { ...r, context: [...(r.context ?? []), nudge] }
+      if (nudge && !('deny' in r)) return { ...r, context: [...(r.context ?? []), nudge] }
     } catch {}
 
     return r
