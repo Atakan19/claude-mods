@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 120" width="300" height="120" role="img" aria-label="cockpit: three rings for context, the 5-hour limit and the 7-day limit that fill and reset">
+  <rect width="300" height="120" rx="28" fill="#17181d"/>
+  <rect x="1" y="1" width="298" height="118" rx="27" fill="none" stroke="#2a2c34" stroke-width="2"/>
+
+  <g fill="none" stroke-width="9" stroke-linecap="round">
+    <!-- context -->
+    <circle cx="60" cy="60" r="30" stroke="#2c2e36"/>
+    <circle cx="60" cy="60" r="30" stroke="#5b7be8" stroke-dasharray="188.5" stroke-dashoffset="56" transform="rotate(-90 60 60)">
+      <animate attributeName="stroke-dashoffset" values="188.5;56;56;188.5" keyTimes="0;0.4;0.85;1" dur="6s" begin="0s" repeatCount="indefinite" calcMode="spline" keySplines="0.3 0 0.2 1;0 0 1 1;0.5 0 0.3 1"/>
+    </circle>
+    <!-- 5h -->
+    <circle cx="150" cy="60" r="30" stroke="#2c2e36"/>
+    <circle cx="150" cy="60" r="30" stroke="#3fb869" stroke-dasharray="188.5" stroke-dashoffset="102" transform="rotate(-90 150 60)">
+      <animate attributeName="stroke-dashoffset" values="188.5;102;102;188.5" keyTimes="0;0.4;0.85;1" dur="6s" begin="0.35s" repeatCount="indefinite" calcMode="spline" keySplines="0.3 0 0.2 1;0 0 1 1;0.5 0 0.3 1"/>
+    </circle>
+    <!-- 7d -->
+    <circle cx="240" cy="60" r="30" stroke="#2c2e36"/>
+    <circle cx="240" cy="60" r="30" stroke="#8b6fe0" stroke-dasharray="188.5" stroke-dashoffset="160" transform="rotate(-90 240 60)">
+      <animate attributeName="stroke-dashoffset" values="188.5;160;160;188.5" keyTimes="0;0.4;0.85;1" dur="6s" begin="0.7s" repeatCount="indefinite" calcMode="spline" keySplines="0.3 0 0.2 1;0 0 1 1;0.5 0 0.3 1"/>
+    </circle>
+  </g>
+</svg>

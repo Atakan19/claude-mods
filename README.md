@@ -1,9 +1,11 @@
 <div align="center">
 
+<img src="plugins/cockpit/assets/logo.svg" alt="cockpit: three rings for context, the 5-hour limit and the 7-day limit" width="170">
+
 # claude-mods
 
-**cockpit** shows Claude Code users their session at a glance:<br>
-context size, 5-hour limit, prompt cache and running agents, in one calm band above the prompt.
+**See what your Claude Code session is doing.**<br>
+**cockpit** puts context size, the 5-hour limit, the prompt cache and your running agents in one calm band above the prompt.
 
 [![CI](https://github.com/Atakan19/claude-mods/actions/workflows/ci.yml/badge.svg)](https://github.com/Atakan19/claude-mods/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
