@@ -271,7 +271,7 @@ export function registerPlan(on: On) {
     return r
   })
 
-  on('tool.call', { tool: 'mcp__ccd_turn__update_plan' }, async ($, e, next) => {
+  on('tool.call', { tool: /^mcp__ccd_turn__update_plan$/ }, async ($, e, next) => {
     const r = await next(e)
     try {
       if (e.agentId === undefined && !('deny' in r) && !r.isError) {
@@ -282,7 +282,7 @@ export function registerPlan(on: On) {
     return r
   })
 
-  on('tool.call', { tool: 'mcp__ccd_turn__wrap_up' }, async ($, e, next) => {
+  on('tool.call', { tool: /^mcp__ccd_turn__wrap_up$/ }, async ($, e, next) => {
     const r = await next(e)
     try {
       if (e.agentId === undefined && !('deny' in r) && !r.isError) {

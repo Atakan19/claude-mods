@@ -1,0 +1,16 @@
+{
+  "name": "claude-mods",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mods for Claude Code: cockpit, a session band, pane and reply line.",
+  "keywords": ["claude-code", "claude-code-plugin", "plugin", "mod", "cockpit", "tokens", "marketplace"],
+  "license": "MIT",
+  "author": "Atakan19",
+  "homepage": "https://github.com/Atakan19/claude-mods#readme",
+  "repository": { "type": "git", "url": "git+https://github.com/Atakan19/claude-mods.git" },
+  "bugs": { "url": "https://github.com/Atakan19/claude-mods/issues" },
+  "scripts": {
+    "validate": "claude plugin validate . && claude plugin validate plugins/cockpit",
+    "test": "claude plugin test plugins/cockpit"
+  }
+}

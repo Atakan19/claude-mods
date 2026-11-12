@@ -17,7 +17,7 @@ const base = (path: string) => path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() 
 
 // One git call; empty when it fails. Only the end is trimmed: porcelain lines start with a space.
 async function git($: EngineInterface, cwd: string, args: string[]) {
-  const r = await $.process.run(['git', '-C', cwd, ...args], { timeoutMs: 3000 }).catch(() => null)
+  const r = await $.process.run(['git', '--no-optional-locks', '-C', cwd, ...args], { timeoutMs: 3000 }).catch(() => null)
   return r?.exitCode === 0 ? r.stdout.trimEnd() : ''
 }
 
@@ -43,7 +43,7 @@ function filesOf(status: string, numstat: string): GitFile[] {
 // A new file's lines, as git counts them against an empty file; at most 20, so a big new folder stays quick.
 async function newLines($: EngineInterface, cwd: string, files: GitFile[]) {
   for (const f of files.filter(f => f.status === '?').slice(0, 20)) {
-    const r = await $.process.run(['git', '-C', cwd, 'diff', '--no-index', '--numstat', '--', '/dev/null', f.path], { timeoutMs: 3000 }).catch(() => null)
+    const r = await $.process.run(['git', '--no-optional-locks', '-C', cwd, 'diff', '--no-index', '--numstat', '--', '/dev/null', f.path], { timeoutMs: 3000 }).catch(() => null)
     const n = Number(r?.stdout.split('\t')[0])
     if (Number.isFinite(n)) f.added = n
   }
@@ -196,7 +196,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
           cacheWarned = true
           $.ui.toast(t().cacheSoon(span(left), k(l.ctxTokens)))
         }
-      })()
+      })().catch(() => {})
     })
     if (pane) await startPane($)
     if (planTool) await startPlanTool($).catch(() => {})
@@ -223,7 +223,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
   })
 
   // The desktop app's own sessions, started from this one: only their title is read.
-  on('tool.call', { tool: 'mcp__ccd_session__start_session' }, async ($, e, next) => {
+  on('tool.call', { tool: /^mcp__ccd_session__start_session$/ }, async ($, e, next) => {
     const r = await next(e)
     try {
       const title = (e as { title?: unknown }).title
@@ -389,7 +389,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
       }
       // A step left hanging: one line for Claude after this result.
       const nudge = agentId === undefined && !('deny' in r) && !LIST_TOOLS.has(e.tool) ? await nudgeIfStuck($) : null
-      if (nudge) return { ...r, context: [...(r.context ?? []), nudge] }
+      if (nudge && !('deny' in r)) return { ...r, context: [...(r.context ?? []), nudge] }
     } catch {}
 
     return r

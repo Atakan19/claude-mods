@@ -1,34 +1,88 @@
+<div align="center">
+
+<img src="plugins/cockpit/assets/logo.svg" alt="cockpit: three rings for context, the 5-hour limit and the 7-day limit" width="170">
+
 # claude-mods
 
+**See what your Claude Code session is doing.**<br>
+**cockpit** puts context size, the 5-hour limit, the prompt cache and your running agents in one calm band above the prompt.
+
+[![CI](https://github.com/Atakan19/claude-mods/actions/workflows/ci.yml/badge.svg)](https://github.com/Atakan19/claude-mods/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 
-Mods for Claude Code. Each mod is a plugin of its own under `plugins/`: install the ones you want, switch off the parts you don't, copy the rest.
+[Install](#install) · [What you get](#what-you-get) · [Options](plugins/cockpit#take-only-what-you-want) · [Contributing](CONTRIBUTING.md)
 
-## Mods
+<img src="plugins/cockpit/assets/cockpit.gif" alt="The cockpit band above the prompt while five agents run and finish (sped up)" width="860">
 
-| Mod | What it does |
-| --- | --- |
-| [**cockpit**](plugins/cockpit) | The session's numbers in one calm place: a band above the prompt, a detail pane, and a line under each reply. |
-| [**lean**](plugins/lean) | Fewer tokens at the same quality: a lean working skill, shell output trimmed before the model reads it, and a cheap read-only scout agent. |
+<sub>The band while five subagents start, run and finish. Shown at 2×.</sub>
 
-<!-- Screenshot: add plugins/cockpit/assets/cockpit.png and uncomment.
-<p align="center"><a href="plugins/cockpit"><img src="plugins/cockpit/assets/cockpit.png" alt="cockpit" width="720"></a></p>
--->
+</div>
 
 ## Install
-
-From a shell:
 
 ```bash
 claude plugin install cockpit --marketplace Atakan19/claude-mods
 ```
 
-In the desktop app: click **+** next to the prompt box → **Plugins** → **Add marketplace** with `Atakan19/claude-mods` → **Add plugin**.
+<sub>In the desktop app: click **+** next to the prompt box → **Plugins** → **Add marketplace** with `Atakan19/claude-mods` → **Add plugin**.</sub>
 
-Each mod's README lists its options and how to keep only some parts.
+Once installed, cockpit works on its own. Nothing needs to be called by hand; the pane opens with `/cockpit`.
 
-## Build your own
+## What you get
+
+**🎛️ Band** above the prompt<br>
+Context, the 5h limit, the prompt cache and running agents at a glance, plus Claude's task list as a progress bar.
+
+**📊 Pane** beside the chat<br>
+Rings for context, 5h and 7d, your git branch, and tabs for the session tree, agents, changed files and history.
+
+**🧾 Reply line** under each reply<br>
+Duration, tool calls, context added, cache hit rate.
+
+**🔔 Sounds and toasts**<br>
+When Claude is done, needs you or fails.
+
+**🧩 Every part switchable**<br>
+Grey while all is well, yellow or red only when something needs attention. Keep only what you want.
+
+<div align="center">
+
+<img src="plugins/cockpit/assets/cockpit-pane.gif" alt="The cockpit pane: rings for context, 5h and 7d, the repository card and an Agents tab with one figure per subagent" width="340">
+
+</div>
+
+## Up close
+
+<table>
+<tr>
+<td width="50%"><img src="plugins/cockpit/assets/gallery-rings.png" alt="Rings for context, the 5-hour and the 7-day limit, and the repository card"></td>
+<td width="50%"><img src="plugins/cockpit/assets/gallery-agents.png" alt="The Agents tab with one figure per subagent"></td>
+</tr>
+<tr>
+<td width="50%"><img src="plugins/cockpit/assets/gallery-session.png" alt="The session tree with tasks and background agents"></td>
+<td width="50%"><img src="plugins/cockpit/assets/gallery-toast.png" alt="The reply line under a reply and the toast when Claude is done"></td>
+</tr>
+</table>
+
+## Take only what you want
+
+Every part of cockpit has its own option. Set it at install with `--config name=value`, later in `/config`, or under `pluginConfigs.cockpit` in your Claude Code settings. Just the band, no pane:
+
+```bash
+claude plugin install cockpit --marketplace Atakan19/claude-mods --config pane=false
+```
+
+The full option table is in the [cockpit README](plugins/cockpit#take-only-what-you-want).
+
+## Compatibility
+
+Developed and tested against Claude Code **2.1.314**, in the terminal and the desktop app. cockpit uses Claude Code's plugin and mod API, so older versions may lack parts of it; put `claude --version` in any bug report.
+
+<details>
+<summary><b>Build your own mod</b></summary>
+
+<br>
 
 Every mod has the same shape, so you can copy one as a starting point:
 
@@ -56,8 +110,8 @@ claude plugin test plugins/cockpit
 claude --plugin-dir plugins/cockpit
 ```
 
-Issues and pull requests are welcome.
+</details>
 
-## License
+## Contributing and license
 
-MIT, see [LICENSE](LICENSE). Code a mod takes from elsewhere keeps its own license, named in that mod's `NOTICE`.
+Issues and pull requests are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md). MIT, see [LICENSE](LICENSE). Code a mod takes from elsewhere keeps its own license, named in that mod's `NOTICE`.

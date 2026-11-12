@@ -172,7 +172,7 @@ test('a list left standing turns its pill amber after 15 calls, until it moves',
   })
 
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
-  const todos = [
+  const todos: { content: string; status: 'pending' | 'in_progress' | 'completed'; activeForm: string }[] = [
     { content: 'Build', status: 'in_progress', activeForm: '' },
     { content: 'Ship', status: 'pending', activeForm: '' },
   ]
@@ -193,7 +193,7 @@ test('a list left standing turns its pill amber after 15 calls, until it moves',
   expect(await mark()).toBe('●')
   await $.tool.call({ tool: 'Read', file_path: '/a' })
   expect(await mark()).toBe('⏳')
-  await $.tool.call({ tool: 'TodoWrite', todos: [{ ...todos[0], status: 'completed' }, { ...todos[1], status: 'in_progress' }] })
+  await $.tool.call({ tool: 'TodoWrite', todos: [{ ...todos[0]!, status: 'completed' }, { ...todos[1]!, status: 'in_progress' }] })
   expect(await mark()).toBe('●')
 })
 
@@ -277,7 +277,7 @@ test('a subchat card shows it at work until a note says it rests', { options: { 
   })
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
-  await $.tool.call({ tool: 'mcp__ccd_session__start_session', title: 'Look test', model: 'claude-sonnet-5-5' })
+  await $.tool.call({ tool: 'mcp__ccd_session__start_session', title: 'Look test', model: 'claude-sonnet-5-5' } as unknown as Parameters<typeof $.tool.call>[0])
   const props = { title: 'Cockpit', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } as const
   const card = async () => {
     const pane = await $.ui.mount({ plugin: 'cockpit', component: 'Pane', requestId: 'cockpit', surface: 'desktop', props })

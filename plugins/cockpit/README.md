@@ -2,9 +2,9 @@
 
 **The session's numbers in one calm place.** Grey while all is well; yellow or red only when something needs attention.
 
-<!-- Screenshot: add assets/cockpit.png (band + pane) and uncomment.
-<p align="center"><img src="assets/cockpit.png" alt="cockpit: the band above the prompt and the pane beside the chat" width="820"></p>
--->
+<p align="center"><img src="assets/cockpit.gif" alt="The cockpit band above the prompt while five agents run and finish (sped up)" width="880"></p>
+
+<p align="center"><img src="assets/cockpit-pane.gif" alt="The cockpit pane: rings for context, 5h and 7d, the repository card, and an Agents tab with one figure per subagent" width="380"></p>
 
 ## What you get
 
