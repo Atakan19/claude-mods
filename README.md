@@ -31,10 +31,6 @@ Once installed, cockpit works on its own. Nothing needs to be called by hand; th
 
 ## What you get
 
-<table>
-<tr>
-<td valign="top">
-
 **🎛️ Band** above the prompt<br>
 Context, the 5h limit, the prompt cache and running agents at a glance, plus Claude's task list as a progress bar.
 
@@ -50,14 +46,11 @@ When Claude is done, needs you or fails.
 **🧩 Every part switchable**<br>
 Grey while all is well, yellow or red only when something needs attention. Keep only what you want.
 
-</td>
-<td align="center" width="340">
+<div align="center">
 
-<img src="plugins/cockpit/assets/cockpit-pane.gif" alt="The cockpit pane: rings for context, 5h and 7d, the repository card and an Agents tab with one figure per subagent" width="320">
+<img src="plugins/cockpit/assets/cockpit-pane.gif" alt="The cockpit pane: rings for context, 5h and 7d, the repository card and an Agents tab with one figure per subagent" width="340">
 
-</td>
-</tr>
-</table>
+</div>
 
 ## Up close
 
