@@ -15,6 +15,8 @@
 
 <img src="plugins/cockpit/assets/cockpit.gif" alt="The cockpit band above the prompt while five agents run and finish (sped up)" width="860">
 
+<sub>The band while five subagents start, run and finish. Shown at 2×.</sub>
+
 </div>
 
 ## Install
@@ -54,6 +56,19 @@ Grey while all is well, yellow or red only when something needs attention. Keep 
 <img src="plugins/cockpit/assets/cockpit-pane.gif" alt="The cockpit pane: rings for context, 5h and 7d, the repository card and an Agents tab with one figure per subagent" width="320">
 
 </td>
+</tr>
+</table>
+
+## Up close
+
+<table>
+<tr>
+<td width="50%"><img src="plugins/cockpit/assets/gallery-rings.png" alt="Rings for context, the 5-hour and the 7-day limit, and the repository card"></td>
+<td width="50%"><img src="plugins/cockpit/assets/gallery-agents.png" alt="The Agents tab with one figure per subagent"></td>
+</tr>
+<tr>
+<td width="50%"><img src="plugins/cockpit/assets/gallery-session.png" alt="The session tree with tasks and background agents"></td>
+<td width="50%"><img src="plugins/cockpit/assets/gallery-toast.png" alt="The reply line under a reply and the toast when Claude is done"></td>
 </tr>
 </table>
 
