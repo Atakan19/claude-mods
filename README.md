@@ -1,46 +1,78 @@
+<div align="center">
+
 # claude-mods
+
+**cockpit** shows Claude Code users their session at a glance:<br>
+context size, 5-hour limit, prompt cache and running agents, in one calm band above the prompt.
 
 [![CI](https://github.com/Atakan19/claude-mods/actions/workflows/ci.yml/badge.svg)](https://github.com/Atakan19/claude-mods/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 
-<p align="center"><img src="plugins/cockpit/assets/cockpit.gif" alt="The cockpit band above the prompt while five agents run and finish (sped up)" width="880"></p>
+[Install](#install) · [What you get](#what-you-get) · [Options](plugins/cockpit#take-only-what-you-want) · [Contributing](CONTRIBUTING.md)
 
-Mods for Claude Code: a session cockpit, packaged as a plugin you can take apart: install it, switch off the parts you don't want, copy the rest.
+<img src="plugins/cockpit/assets/cockpit.gif" alt="The cockpit band above the prompt while five agents run and finish (sped up)" width="860">
 
-Each mod is a plugin of its own under `plugins/`; more may follow.
-
-## Mods
-
-| Mod | What it does |
-| --- | --- |
-| [**cockpit**](plugins/cockpit) | The session's numbers in one calm place: a band above the prompt, a detail pane, and a line under each reply. |
+</div>
 
 ## Install
-
-From a shell:
 
 ```bash
 claude plugin install cockpit --marketplace Atakan19/claude-mods
 ```
 
-In the desktop app: click **+** next to the prompt box → **Plugins** → **Add marketplace** with `Atakan19/claude-mods` → **Add plugin**.
+<sub>In the desktop app: click **+** next to the prompt box → **Plugins** → **Add marketplace** with `Atakan19/claude-mods` → **Add plugin**.</sub>
 
-The cockpit README lists its options and how to keep only some parts.
+Once installed, cockpit works on its own. Nothing needs to be called by hand; the pane opens with `/cockpit`.
 
-## Usage
+## What you get
 
-Once installed, cockpit works on its own: it shows its band above the prompt and opens its pane with `/cockpit`. Nothing needs to be called by hand.
+<table>
+<tr>
+<td valign="top">
 
-## Configuration
+**🎛️ Band** above the prompt<br>
+Context, the 5h limit, the prompt cache and running agents at a glance, plus Claude's task list as a progress bar.
 
-Every part of cockpit has its own option. Set it at install with `--config name=value`, later in `/config`, or under `pluginConfigs.<mod>` in your Claude Code settings. The full option table is in the [cockpit README](plugins/cockpit#take-only-what-you-want).
+**📊 Pane** beside the chat<br>
+Rings for context, 5h and 7d, your git branch, and tabs for the session tree, agents, changed files and history.
+
+**🧾 Reply line** under each reply<br>
+Duration, tool calls, context added, cache hit rate.
+
+**🔔 Sounds and toasts**<br>
+When Claude is done, needs you or fails.
+
+**🧩 Every part switchable**<br>
+Grey while all is well, yellow or red only when something needs attention. Keep only what you want.
+
+</td>
+<td align="center" width="340">
+
+<img src="plugins/cockpit/assets/cockpit-pane.gif" alt="The cockpit pane: rings for context, 5h and 7d, the repository card and an Agents tab with one figure per subagent" width="320">
+
+</td>
+</tr>
+</table>
+
+## Take only what you want
+
+Every part of cockpit has its own option. Set it at install with `--config name=value`, later in `/config`, or under `pluginConfigs.cockpit` in your Claude Code settings. Just the band, no pane:
+
+```bash
+claude plugin install cockpit --marketplace Atakan19/claude-mods --config pane=false
+```
+
+The full option table is in the [cockpit README](plugins/cockpit#take-only-what-you-want).
 
 ## Compatibility
 
-Developed and tested against Claude Code **2.1.314**, in the terminal and the desktop app. The mods use Claude Code's plugin and mod API, so older versions may lack parts of it; put `claude --version` in any bug report.
+Developed and tested against Claude Code **2.1.314**, in the terminal and the desktop app. cockpit uses Claude Code's plugin and mod API, so older versions may lack parts of it; put `claude --version` in any bug report.
 
-## Build your own
+<details>
+<summary><b>Build your own mod</b></summary>
+
+<br>
 
 Every mod has the same shape, so you can copy one as a starting point:
 
@@ -68,8 +100,8 @@ claude plugin test plugins/cockpit
 claude --plugin-dir plugins/cockpit
 ```
 
-Issues and pull requests are welcome.
+</details>
 
-## License
+## Contributing and license
 
-MIT, see [LICENSE](LICENSE). Code a mod takes from elsewhere keeps its own license, named in that mod's `NOTICE`.
+Issues and pull requests are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md). MIT, see [LICENSE](LICENSE). Code a mod takes from elsewhere keeps its own license, named in that mod's `NOTICE`.
