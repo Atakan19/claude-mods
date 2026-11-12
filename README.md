@@ -4,6 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-d97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 
+<p align="center"><img src="plugins/cockpit/assets/cockpit.gif" alt="The cockpit band above the prompt while five agents run and finish (sped up)" width="880"></p>
+
 Mods for Claude Code: a session cockpit, packaged as a plugin you can take apart: install it, switch off the parts you don't want, copy the rest.
 
 Each mod is a plugin of its own under `plugins/`; more may follow.
@@ -13,10 +15,6 @@ Each mod is a plugin of its own under `plugins/`; more may follow.
 | Mod | What it does |
 | --- | --- |
 | [**cockpit**](plugins/cockpit) | The session's numbers in one calm place: a band above the prompt, a detail pane, and a line under each reply. |
-
-<!-- Screenshot: add plugins/cockpit/assets/cockpit.png and uncomment.
-<p align="center"><a href="plugins/cockpit"><img src="plugins/cockpit/assets/cockpit.png" alt="cockpit" width="720"></a></p>
--->
 
 ## Install
 
