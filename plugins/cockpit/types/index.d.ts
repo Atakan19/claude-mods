@@ -100,6 +100,10 @@ export type Plan = { title: string; steps: Step[]; startedAt: number; idle?: num
 // A plan Claude reports with cockpit's own progress tool (option planTool): one bar per id, a stage per step.
 export type ToolPlan = Plan & { id: string }
 
+// Where /handoff stands: watching for the size, saving the note, or clearing. `armed` is off after a
+// handoff until the context drops below the size; `toasted` once the one toast was shown.
+export type HandoffState = { phase: 'watching' | 'saving' | 'finishing'; mode: 'clear' | 'compact'; armed: boolean; toasted: boolean }
+
 declare module 'claude-code' {
   interface PluginState {
     cockpit: {
@@ -123,6 +127,7 @@ declare module 'claude-code' {
       events: SessionEvent[]
       goals: Goal[]
       repoOpen: boolean
+      handoff: HandoffState
     }
   }
 }

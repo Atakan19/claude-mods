@@ -5,6 +5,7 @@ import { cacheLeft, cacheTtlMs, k, modelName, span } from './format'
 import { retitlePane, startPane } from './pane'
 import { clearDonePlan, LIST_TOOLS, nudgeIfStuck, startPlanTool } from './plan'
 import { FOLD_MS } from './progress'
+import { handoffAfterTurn, startHandoff } from './handoff'
 import { chooseLang, setLang, t } from './i18n'
 import { play } from './sound'
 import { addActivity, addEvent, addGoal, addShell, addSubchat, addTouch, setSubchatStates, addTurn, endGoals, bumpTick, countAgent, dropDoneCrew, endShells, countIdle, getCrew, getLive, setEnv, setLive, setRunning, upsertCrew } from './state'
@@ -174,7 +175,7 @@ export function subchatStates(text: string): Map<string, boolean> {
 }
 
 // The one source every part draws from: usage, turns, running tools and agents.
-export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boolean, language: unknown, planTool = false) {
+export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boolean, language: unknown, planTool = false, handoffAt = 0) {
   let turnStart = { ctx: 0, cost: 0, tools: 0, prompt: '' }
   let cacheWarned = false
 
@@ -200,6 +201,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     })
     if (pane) await startPane($)
     if (planTool) await startPlanTool($).catch(() => {})
+    if (handoffAt > 0) await startHandoff($).catch(() => {})
     // In the background: a slow repository must not hold up the session's start.
     void refreshEnv($)
 
@@ -417,6 +419,7 @@ export function registerData(on: On, toasts: boolean, pane: boolean, sounds: boo
     })
     cacheWarned = false
     const l = await getLive($)
+    await handoffAfterTurn($, e, l?.ctxTokens ?? 0, handoffAt, toasts).catch(() => {})
     const u = e.usage
     const prompt = u ? u.input_tokens + u.cache_read_input_tokens + u.cache_creation_input_tokens : 0
     const turn: Turn = {

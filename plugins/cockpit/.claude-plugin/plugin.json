@@ -22,6 +22,7 @@
     "replyLine": { "type": "boolean", "title": "Reply line", "description": "Show a line of figures under each reply", "default": true },
     "spinner": { "type": "boolean", "title": "Spinner", "description": "Add the tool count to the working line", "default": true },
     "sounds": { "type": "boolean", "title": "Sounds", "description": "Play a sound when Claude is done, needs you, or fails", "default": true },
+    "handoffAtK": { "type": "number", "title": "Handoff hint at k tokens", "description": "From this context size (thousands of tokens, 200 = 200k) the band recommends /handoff and one toast says so; nothing runs until you type it. 0 is off", "default": 200, "min": 0, "max": 1000 },
     "toasts": { "type": "boolean", "title": "Toasts", "description": "Say when Claude is done, needs you or fails; warn before the cache lapses and at 90% of the 5h limit", "default": true }
   }
 }

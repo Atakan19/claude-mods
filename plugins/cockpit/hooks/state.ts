@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { Activity, AgentRow, Env, Goal, Live, Plan, Running, SessionEvent, Shell, Subchat, ToolPlan, Touch, Turn } from '../types'
+import type { Activity, AgentRow, Env, Goal, HandoffState, Live, Plan, Running, SessionEvent, Shell, Subchat, ToolPlan, Touch, Turn } from '../types'
 
 export const PANE = 'cockpit'
 // The history, opened as a dialog from the pane.
@@ -37,6 +37,13 @@ const touches = atom({ plugin: 'cockpit', key: 'touches' } as const, [])
 const activity = atom({ plugin: 'cockpit', key: 'activity' } as const, [])
 const events = atom({ plugin: 'cockpit', key: 'events' } as const, [])
 const goals = atom({ plugin: 'cockpit', key: 'goals' } as const, [])
+const handoff = atom({ plugin: 'cockpit', key: 'handoff' } as const, { phase: 'watching', mode: 'clear', armed: true, toasted: false })
+export async function getHandoff($: EngineInterface) {
+  return read($, handoff)
+}
+export async function setHandoff($: EngineInterface, patch: Partial<HandoffState>) {
+  await update($, handoff, h => ({ ...h, ...patch }))
+}
 // Whether the repo card's details are folded open.
 const repoOpen = atom({ plugin: 'cockpit', key: 'repoOpen' } as const, false)
 

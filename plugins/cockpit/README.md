@@ -12,6 +12,7 @@
 - 📊 **Pane** beside the chat (`/cockpit`): rings for context, 5h and 7d, your git branch, and tabs for the session tree, agents, changed files and history
 - 🧾 **Reply line** under each reply: duration, tool calls, context added, cache hit rate
 - 🔔 **Sounds and toasts** when Claude is done, needs you or fails
+- 🔁 **Handoff, when you choose**: past 200k context the band recommends `/handoff`. Nothing happens on its own; when it suits, `/handoff` saves a note (where you stopped, next step, facts), clears the context and leaves the pick-up prompt in the box. `/handoff <note>` says where you stand, `/handoff compact` summarises instead of clearing
 - 🗂️ **Plans in stages** (optional): Claude reports bigger jobs like a release as their own bars, Build → Deploy → Verify
 - 🧩 **Every part switchable** on its own, so you keep only what you want
 
@@ -62,6 +63,7 @@ claude plugin install cockpit --marketplace Atakan19/claude-mods --config sounds
 | `replyLine` | on | the line under each reply |
 | `spinner` | on | the tool count in the working line |
 | `sounds`, `toasts` | on | the sound and the toast when Claude is done, waits or fails |
+| `handoffAtK` | `200` | context size in thousands of tokens from which the band recommends `/handoff` (one toast too); `0` turns the hint and the command off |
 
 </details>
 
@@ -142,7 +144,7 @@ claude --plugin-dir .
 
 ## Privacy
 
-Blocks and sends nothing; no network requests, no files read. It adds for Claude only a one-line reminder after a tool result while a task step hangs, and with `planTool` on its progress tool.
+Blocks and sends nothing; no network requests, no files read. It adds for Claude only a one-line reminder after a tool result while a task step hangs, with `planTool` on its progress tool, and, when you run `/handoff`, the prompt that asks for the note.
 
 <details>
 <summary>Exactly what it reads</summary>
