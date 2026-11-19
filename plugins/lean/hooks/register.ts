@@ -2,9 +2,8 @@ import type { EngineInterface, Register, ToolCallResult } from 'claude-code'
 import { registerCheckTool, startCheckTool } from './check'
 import { registerCodeTool, startCodeTool } from './code'
 import { registerFormat } from './format'
-import { handoffOptions, registerHandoff } from './handoff'
 import { registerReadGuard } from './read'
-import { agentModelOption, registerRoute } from './route'
+import { agentModelOption, registerRoute, sessionModelOption } from './route'
 import { registerTestGuard } from './testguard'
 import { FULL_OUTPUT, trim } from './trim'
 
@@ -69,7 +68,5 @@ export const register: Register = (on, options) => {
     return r
   })
   if (options.formatOnEdit === true) registerFormat(on)
-  registerRoute(on, agentModelOption(options))
-  const handoff = handoffOptions(options)
-  if (handoff) registerHandoff(on, handoff)
+  registerRoute(on, agentModelOption(options), sessionModelOption(options))
 }

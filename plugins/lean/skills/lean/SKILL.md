@@ -9,8 +9,13 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 
 ## Context
 - One session, one goal. A new topic starts a new session with a brief.
-- Past about 200k the handoff saves a brief and starts over. Keep state that matters in that brief, not only in the chat.
 - CLAUDE.md and the memory index load every turn: keep them a map (where things are, rules, commands), not docs. Details go in files read on demand; one line per memory in MEMORY.md.
+
+## Model
+Opus is the main model. The saving comes from handing cheap work to cheaper models (scout on Haiku, builder and search agents on Sonnet), not from switching the main chat down. You cannot switch your own model; the user does it in the model menu.
+- On Sonnet or Haiku, say once in the first reply to a task "Dafür brauchen wir Opus" with the reason, for: architecture or design across modules, a failure still unclear after two real attempts, security or data-loss risk, a review that must catch subtle bugs. Say nothing when the model fits.
+- A switch mid-session rewrites the prompt cache: past about 100k context, advise an upgrade only when stuck.
+- Side sessions start on Sonnet by hook. Pass `model` only for design or architecture.
 
 ## Read and analyse
 - A file under about 300 lines: read it whole, once. Every extra turn re-sends the context, so piecewise reads of a short file cost more than one full read.
@@ -33,6 +38,8 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 - A green full run stays valid: after it, test only what changed and what depends on it. Let the tools pick: `pytest --testmon` (pytest-testmon) where installed, `pytest --lf` after a failure, `pytest -x -q` while fixing; `vitest related <files> --run`, `jest --findRelatedTests <files>`. The test guard refuses a needless full run once; send it again only for the final check.
 - Before starting a long run, check the background tasks: never start a run that is already going; wait for its result.
 - Git and GitHub locally: checks, merges and conflicts on this machine, then push once. Do not wait on, poll or re-run GitHub Actions. A CI run that fails on minutes or limits is not a code failure: check locally and go on.
+- Ship by state, not per step. Commit every green step locally; that is cheap. Push, PR, merge, deploy and restart only when: the goal of this task is done and checked, the user asks, another session needs the work, or a running system is the only way to verify the change. While more steps of the same goal are known to follow, do none of them and do not offer them. One goal, one branch, one PR, one merge.
+- Restart a server only when the change needs it to run; prefer hot reload. Deploy only when the user asks. A repo's own CLAUDE.md wins.
 - `gh` reads take only the fields needed: `gh pr view 12 --json state,mergeable --jq '.state'`, `gh run view <id> --log-failed`, never full `gh pr view` or `gh api` dumps.
 - Shell output may arrive trimmed with a path to the full log. Read that file only when the trimmed part is not enough.
 
@@ -43,9 +50,9 @@ A subagent reads in its own context on a cheaper model and hands back only its r
 - A planned change over more than one file, or mechanical work (renames, wiring, tests for a planned function) → `builder` (Sonnet) with the brief below. You plan and check its report; you do not redo its reads.
 - One file, a known spot, or a decision → do it yourself.
 - Independent pieces → several subagents in one message; they run in parallel.
-- Side session (a separate chat the user can open and steer): only for a result of its own (a branch, a PR). Start it on Sonnet unless the task is design or architecture.
-- Opus is for planning, design, debugging unclear failures and review. General-purpose and Explore agents run on Sonnet unless you pass `model`.
-- Every handoff, side session and scout gets this brief:
+- Side session (a separate chat the user can open and steer): only for a result of its own (a branch, a PR).
+- General-purpose and Explore agents run on Sonnet unless you pass `model`.
+- Every side session and scout gets this brief:
   1. Goal, and what done looks like.
   2. What is done.
   3. Next step.
