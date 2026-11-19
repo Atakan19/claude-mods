@@ -12,6 +12,14 @@ const de = {
   fiveHourAt: (p: number) => `5h-Limit bei ${p} %`,
   opened: 'Cockpit geöffnet.',
   openPane: 'Das Cockpit-Panel öffnen',
+  // handoff
+  handoffCommand: 'Stand als Notiz sichern, dann Kontext leeren (compact: zusammenfassen)',
+  handoffHint: (k: number) => `Kontext bei ${k}k: Handoff empfohlen, wenn es gerade passt (/handoff)`,
+  handoffPill: 'Handoff empfohlen',
+  handoffTip: 'Tippe /handoff an einer passenden Stelle.\n  /handoff <Notiz>: sag, wo ihr steht\n  /handoff compact: zusammenfassen statt leeren',
+  handoffSaving: (mode: string) => `Handoff: Notiz wird geschrieben, danach ${mode === 'compact' ? '/compact' : '/clear'}.`,
+  handoffBusy: 'Handoff läuft schon.',
+  handoffFailed: 'Handoff: /clear bzw. /compact ist fehlgeschlagen',
   // events between turns
   compactBy: (manual: boolean, size: string) => `${manual ? '/compact' : 'automatisch'} bei ${size}`,
   // weather of the context
@@ -140,6 +148,13 @@ const en: typeof de = {
   fiveHourAt: p => `5h limit at ${p}%`,
   opened: 'Cockpit opened.',
   openPane: 'Open the cockpit pane',
+  handoffCommand: 'Save where things stand as a note, then clear the context (compact: summarise)',
+  handoffHint: k => `Context at ${k}k: a handoff is recommended when it suits (/handoff)`,
+  handoffPill: 'Handoff recommended',
+  handoffTip: 'Type /handoff at a good point.\n  /handoff <note>: say where you stand\n  /handoff compact: summarise instead of clearing',
+  handoffSaving: mode => `Handoff: writing the note, then ${mode === 'compact' ? '/compact' : '/clear'}.`,
+  handoffBusy: 'A handoff is already running.',
+  handoffFailed: 'Handoff: /clear or /compact failed',
   compactBy: (manual, size) => `${manual ? '/compact' : 'automatic'} at ${size}`,
   weather: { clear: 'Clear', cloudy: 'Cloudy', showers: 'Showers', storm: 'Storm', compact: 'Compact soon' },
   tokensOf: n => `Tokens of the last ${n} prompts`,

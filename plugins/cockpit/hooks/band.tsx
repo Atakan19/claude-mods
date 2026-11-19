@@ -48,9 +48,10 @@ import {
   trackSvg,
   visibleAgents,
 } from './progress'
+import { handoffDue, handoffTokens } from './handoff'
 import { t } from './i18n'
 import { lastEnd, planState, stuckStep } from './plan'
-import { bumpTick, getBars, getCrew, getHidden, getLive, getPlan, getRunning, getTick, getTurns, setHidden } from './state'
+import { bumpTick, getBars, getCrew, getHandoff, getHidden, getLive, getPlan, getRunning, getTick, getTurns, setHidden } from './state'
 
 type Ui = Pick<Elements['desktop'], 'Box' | 'Text' | 'Svg' | 'Button'>
 
@@ -62,10 +63,14 @@ const HANG = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"><pa
 
 // Which pills the person kept, from /config; fixed per load, as a change of options reloads the module.
 let PILLS = { context: true, limit: true, cache: true, agents: true }
-type BandOptions = { pillContext?: unknown; pillLimit?: unknown; pillCache?: unknown; pillAgents?: unknown }
+// The size that brings the handoff hint (fixed per load), and whether it shows in the drawing under way.
+let HANDOFF_AT = 0
+let handoffNow = false
+type BandOptions = { pillContext?: unknown; pillLimit?: unknown; pillCache?: unknown; pillAgents?: unknown; handoffAtK?: unknown }
 
 export function registerBand(on: On, options: BandOptions = {}) {
   PILLS = { context: options.pillContext !== false, limit: options.pillLimit !== false, cache: options.pillCache !== false, agents: options.pillAgents !== false }
+  HANDOFF_AT = handoffTokens(options.handoffAtK ?? 200)
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
@@ -82,6 +87,7 @@ export function registerBand(on: On, options: BandOptions = {}) {
     // A finished task list folds away like the strips: draw once more when it is due.
     if (plan && plan.steps.length > 0 && planState(plan).done) settleBy($, lastEnd(plan) + FOLD_MS + 100, now)
 
+    handoffNow = handoffDue(await getHandoff($), l.ctxTokens, HANDOFF_AT)
     const ui = $.ui.resolve(e)
     const tree = e.surface === 'desktop' && 'Svg' in ui ? desktop($, ui, l, turns, running, crew, bars, now, e.props.bodyColumns) : terminal(ui, l, turns, running, crew, bars, now)
     // What the host and later mods draw here stays below the band. No gap: the host often draws an
@@ -298,6 +304,11 @@ function pillRow(ui: Ui, l: Live, turns: Turn[], running: Running, crew: AgentRo
   // No reading before the first reply: the pill waits for one.
   if (PILLS.context && l.ctxTokens > 0) pills.push({ key: 'context', tint: TINTS.context!, parts: ctx, tip: t().ofWindow(t().weather[f.id] ?? '', Math.round(l.ctxPercent), short(l.ctxWindow)) })
 
+  // Handoff: only a hint; nothing runs until the person types /handoff.
+  if (handoffNow) {
+    pills.push({ key: 'handoff', tint: TINTS.fast!, parts: [<Text key="h" bold color={TONES.fast.text}>{t().handoffPill}</Text>, <Text key="c" dimColor>/handoff</Text>], tip: t().handoffTip })
+  }
+
   // 5h: the gauge against the clock, then the time to the reset.
   const five = l.limits.find(lim => lim.kind === 'five_hour' && !(Date.parse(lim.resetsAt ?? '') <= now))
   if (PILLS.limit && five) {
@@ -443,6 +454,12 @@ function terminal({ Box, Text }: Pick<Elements['terminal'], 'Box' | 'Text'>, l: 
         {PILLS.context && <Text color={f.color}>{f.icon} </Text>}
         {PILLS.context && <Text bold>{short(l.ctxTokens)}</Text>}
         {PILLS.context && deltas.length >= 2 && <Text dimColor> {barsText(deltas)} {trendWord(turns[turns.length - 1]?.ctxDelta)}</Text>}
+        {handoffNow && (
+          <Text>
+            {sep}
+            <Text color={TONES.fast.text}>{t().handoffPill}</Text> <Text dimColor>/handoff</Text>
+          </Text>
+        )}
         {PILLS.limit && g && (
           <Text>
             {sep}5h <Text color={TONES[g.tone].text}>{textGauge(g)}</Text> <Text bold>{g.value}</Text>
