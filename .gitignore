@@ -3,3 +3,4 @@
 .mcpb-cache/
 **/.claude-plugin/types/
 plugins/lean/.out/
+node_modules/

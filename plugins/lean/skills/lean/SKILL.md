@@ -9,15 +9,12 @@ Every turn re-sends the whole context; reading it again is most of the cost. Kee
 
 ## Context
 - One session, one goal. A new topic starts a new session with a brief.
-- Past about 200k the handoff saves a brief and starts over. Keep state that matters in that brief, not only in the chat.
 - CLAUDE.md and the memory index load every turn: keep them a map (where things are, rules, commands), not docs. Details go in files read on demand; one line per memory in MEMORY.md.
 
 ## Model
-Sonnet is the default. You cannot switch your own model; the user does it in the model menu. In the first reply to a new task, say in one line when the model does not fit, then go on. Say nothing when it fits.
-- On Sonnet or Haiku, say "Dafür brauchen wir Opus" for: architecture or design across modules, a failure still unclear after two real attempts, security or data-loss risk, a review that must catch subtle bugs.
-- On Sonnet or Opus, say "Dafür reicht Haiku" for: a mechanical change at a known spot, a rename, docs or text, a question one file answers.
-- On Opus, say "Dafür reicht Sonnet" for normal features, fixes and tests with a clear plan.
-- Name the model and the reason in that one line, and say it once per task. A switch mid-session rewrites the prompt cache: past about 100k context, advise a downgrade only for a new session, and an upgrade only when stuck.
+Opus is the main model. The saving comes from handing cheap work to cheaper models (scout on Haiku, builder and search agents on Sonnet), not from switching the main chat down. You cannot switch your own model; the user does it in the model menu.
+- On Sonnet or Haiku, say once in the first reply to a task "Dafür brauchen wir Opus" with the reason, for: architecture or design across modules, a failure still unclear after two real attempts, security or data-loss risk, a review that must catch subtle bugs. Say nothing when the model fits.
+- A switch mid-session rewrites the prompt cache: past about 100k context, advise an upgrade only when stuck.
 - Side sessions start on Sonnet by hook. Pass `model` only for design or architecture.
 
 ## Read and analyse
@@ -55,7 +52,7 @@ A subagent reads in its own context on a cheaper model and hands back only its r
 - Independent pieces → several subagents in one message; they run in parallel.
 - Side session (a separate chat the user can open and steer): only for a result of its own (a branch, a PR).
 - General-purpose and Explore agents run on Sonnet unless you pass `model`.
-- Every handoff, side session and scout gets this brief:
+- Every side session and scout gets this brief:
   1. Goal, and what done looks like.
   2. What is done.
   3. Next step.
